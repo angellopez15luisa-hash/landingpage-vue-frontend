@@ -5,25 +5,7 @@ import VueEasyLightbox from 'vue-easy-lightbox'
 
 const selectedCategory = ref('Todos')
 
-onMounted(() => {
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-visible')
-        } else {
-          entry.target.classList.remove('is-visible')
-        }
-      })
-    },
-    { threshold: 0.1 },
-  )
-
-  document.querySelectorAll('.animate-on-scroll').forEach((el) => {
-    observer.observe(el)
-  })
-})
-
+// Estados para vue-easy-lightbox
 const visibleRef = ref(false)
 const imgsRef = ref<string[]>([])
 const indexRef = ref(0)
@@ -43,6 +25,25 @@ const filteredItems = computed(() => {
     return catalogItems
   }
   return catalogItems.filter((item) => item.category === selectedCategory.value)
+})
+
+onMounted(() => {
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible')
+        } else {
+          entry.target.classList.remove('is-visible')
+        }
+      })
+    },
+    { threshold: 0.1 },
+  )
+
+  document.querySelectorAll('.animate-on-scroll').forEach((el) => {
+    observer.observe(el)
+  })
 })
 </script>
 
@@ -76,11 +77,10 @@ const filteredItems = computed(() => {
         class="product-card animate-on-scroll"
         :style="{ transitionDelay: `${index * 0.1}s` }"
       >
+        <!-- Al hacer clic llama a la función que abre el lightbox -->
         <div class="product-image-wrapper clickable-zoom" @click="showSingleImage(item.image)">
           <img :src="item.image" :alt="item.title" class="product-img" />
           <span v-if="item.badge" class="product-badge">{{ item.badge }}</span>
-
-          <!-- Botón con comportamiento adaptable sin fallas -->
           <div class="product-overlay-action">
             <span class="btn-zoom-preview">🔍 Ampliar Imagen</span>
           </div>
@@ -97,11 +97,13 @@ const filteredItems = computed(() => {
       </div>
     </div>
 
+    <!-- Componente oficial de la librería para el Zoom/Lightbox -->
     <vue-easy-lightbox :visible="visibleRef" :imgs="imgsRef" :index="indexRef" @hide="onHide" />
   </section>
 </template>
 
 <style scoped>
+/* --- (Mantén todos tus estilos actuales de CSS aquí abajo intactos) --- */
 .catalog-container {
   position: relative;
   width: 100%;
@@ -128,35 +130,13 @@ const filteredItems = computed(() => {
 .filter-btn.active { background: linear-gradient(135deg, #00f5a0 0%, #00d9f5 100%); color: #0b0e14; border-color: transparent; }
 .catalog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; width: 100%; max-width: 1200px; z-index: 2; }
 .product-card { position: relative; background: rgba(14, 16, 23, 0.85); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 20px; overflow: hidden; z-index: 2; display: flex; flex-direction: column; transition: transform 0.4s ease; }
-.product-image-wrapper { position: relative; width: 100%; height: 340px; overflow: hidden; background-color: #121620; cursor: pointer; touch-action: manipulation; }
+.product-image-wrapper { position: relative; width: 100%; height: 340px; overflow: hidden; background-color: #121620; cursor: pointer; }
 .product-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
+.product-card:hover .product-img { transform: scale(1.08); }
 .product-badge { position: absolute; top: 15px; left: 15px; background: rgba(11, 14, 20, 0.85); border: 1px solid rgba(0, 245, 160, 0.3); color: #00f5a0; padding: 5px 14px; border-radius: 99px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; z-index: 3; }
-
-/*
-  ESTILO BASE: Por defecto el botón está VISIBLE (para móviles y pantallas generales).
-  De esta forma evitamos que se oculte por culpa de reglas de hover malinterpretadas.
-*/
-.product-overlay-action {
-  position: absolute;
-  inset: 0;
-  background: rgba(11, 14, 20, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-  opacity: 1; /* Visible por defecto */
-}
-
-.btn-zoom-preview {
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #ffffff;
-  padding: 10px 22px;
-  border-radius: 99px;
-  font-weight: 700;
-  font-size: 0.85rem;
-}
-
+.product-overlay-action { position: absolute; inset: 0; background: rgba(11, 14, 20, 0.55); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; z-index: 2; }
+.product-card:hover .product-overlay-action { opacity: 1; }
+.btn-zoom-preview { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: #ffffff; padding: 10px 22px; border-radius: 99px; font-weight: 700; font-size: 0.85rem; }
 .product-info { padding: 25px; display: flex; flex-direction: column; flex-grow: 1; justify-content: space-between; }
 .product-category { font-size: 0.75rem; text-transform: uppercase; color: #00f5a0; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 8px; }
 .product-title { font-size: 1.2rem; font-weight: 800; color: #ffffff; margin-bottom: 18px; }
@@ -165,21 +145,4 @@ const filteredItems = computed(() => {
 .btn-quick-order { background: linear-gradient(135deg, #00f5a0 0%, #00d9f5 100%); color: #0b0e14; padding: 8px 16px; border-radius: 99px; font-weight: 800; font-size: 0.75rem; text-decoration: none; }
 .animate-on-scroll { opacity: 0; transform: translateY(40px); transition: opacity 1.2s ease, transform 1.2s ease; }
 .animate-on-scroll.is-visible { opacity: 1; transform: translateY(0); }
-
-/*
-  SOLO EN COMPUTADORAS (DONDE SÍ HAY MOUSE REAL):
-  Invertimos la lógica: ocultamos el botón por defecto y hacemos que aparezca al hacer hover.
-*/
-@media (pointer: fine) {
-  .product-overlay-action {
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  .product-card:hover .product-overlay-action {
-    opacity: 1;
-  }
-  .product-card:hover .product-img {
-    transform: scale(1.08);
-  }
-}
 </style>
