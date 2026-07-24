@@ -102,6 +102,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* --- ESTILOS GENERALES (PC) --- */
 .catalog-container {
   position: relative;
   width: 100%;
@@ -130,11 +131,8 @@ onMounted(() => {
 .product-card { position: relative; background: rgba(14, 16, 23, 0.85); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 20px; overflow: hidden; z-index: 2; display: flex; flex-direction: column; transition: transform 0.4s ease; }
 .product-image-wrapper { position: relative; width: 100%; height: 340px; overflow: hidden; background-color: #121620; cursor: pointer; touch-action: manipulation; }
 .product-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
-.product-card:hover .product-img { transform: scale(1.08); }
 .product-badge { position: absolute; top: 15px; left: 15px; background: rgba(11, 14, 20, 0.85); border: 1px solid rgba(0, 245, 160, 0.3); color: #00f5a0; padding: 5px 14px; border-radius: 99px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; z-index: 3; }
-.product-overlay-action { position: absolute; inset: 0; background: rgba(11, 14, 20, 0.55); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; z-index: 2; }
-.product-card:hover .product-overlay-action { opacity: 1; }
-.btn-zoom-preview { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: #ffffff; padding: 10px 22px; border-radius: 99px; font-weight: 700; font-size: 0.85rem; }
+.btn-zoom-preview { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: #ffffff; padding: 10px 22px; border-radius: 99px; font-weight: 700; font-size: 0.85rem; transition: none !important; }
 .product-info { padding: 25px; display: flex; flex-direction: column; flex-grow: 1; justify-content: space-between; }
 .product-category { font-size: 0.75rem; text-transform: uppercase; color: #00f5a0; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 8px; }
 .product-title { font-size: 1.2rem; font-weight: 800; color: #ffffff; margin-bottom: 18px; }
@@ -144,20 +142,48 @@ onMounted(() => {
 .animate-on-scroll { opacity: 0; transform: translateY(40px); transition: opacity 1.2s ease, transform 1.2s ease; }
 .animate-on-scroll.is-visible { opacity: 1; transform: translateY(0); }
 
-/* --- FORZAR VISIBILIDAD PERMANENTE EN MÓVIL --- */
+/* --- LOGICA DE VISIBILIDAD DEL BOTÓN --- */
+
+/* 1. ESTADO POR DEFECTO PARA MÓVIL (Forzado con Máxima Especificidad) */
 @media (hover: none) {
-  /* Anulamos la opacidad cero global para que esté fijo */
-  .product-image-wrapper .product-overlay-action {
-    opacity: 1 !important;
-    background: rgba(11, 14, 20, 0.45) !important;
+  .catalog-grid .product-card .product-image-wrapper .product-overlay-action {
+    opacity: 1 !important;            /* Visibilidad absoluta */
+    visibility: visible !important;   /* Garantizado */
+    background: rgba(11, 14, 20, 0.5) !important; /* Fondo semitransparente */
     backdrop-filter: blur(2px) !important;
-    visibility: visible !important;
-    transition: none !important;
+    transition: none !important;      /* Sin animación de fundido */
+    pointer-events: auto !important;  /* Asegura que el toque vaya al botón */
   }
 
-  .product-image-wrapper .btn-zoom-preview {
+  /* El botón interior también debe estar fijo y sin transformación */
+  .catalog-grid .product-card .product-image-wrapper .product-overlay-action .btn-zoom-preview {
     transform: translateY(0) !important;
+    opacity: 1 !important;
     transition: none !important;
+  }
+}
+
+/* 2. ESTADO PARA PC (Hover) - Oculto por defecto, aparece al pasar el mouse */
+@media (hover: hover) {
+  .product-overlay-action {
+    position: absolute;
+    inset: 0;
+    background: rgba(11, 14, 20, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;                       /* Oculto por defecto en PC */
+    transition: opacity 0.3s ease;    /* Con transición suave */
+    z-index: 2;
+  }
+
+  .product-card:hover .product-overlay-action {
+    opacity: 1;                       /* Aparece al hacer hover en PC */
+  }
+
+  /* Efecto de zoom de la imagen solo en PC */
+  .product-card:hover .product-img {
+    transform: scale(1.08);
   }
 }
 </style>
