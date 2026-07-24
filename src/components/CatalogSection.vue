@@ -1,34 +1,152 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { catalogCategories, catalogItems } from '@/data/catalog.data';
+import { ref, computed, onMounted } from 'vue'
+import { catalogCategories, catalogItems } from '@/data/catalog.data'
 
-const selectedCategory = ref('Todos');
+const selectedCategory = ref('Todos')
+
+// Estado para el modal de zoom
+const activeImage = ref<string | null>(null)
+const scale = ref(1)
+const posX = ref(0)
+const posY = ref(0)
+const isDragging = ref(false)
+
+let startX = 0
+let startY = 0
+
+// Variables táctiles para celulares (Pinch to zoom y arrastre de 1 o 2 dedos)
+let initialDistance = 0
+let initialScale = 1
+
+const openModal = (imgUrl: string) => {
+  activeImage.value = imgUrl
+  scale.value = 1
+  posX.value = 0
+  posY.value = 0
+}
+
+const closeModal = () => {
+  activeImage.value = null
+  scale.value = 1
+  posX.value = 0
+  posY.value = 0
+}
+
+// Alternar zoom con doble clic (PC / Móvil)
+const handleDoubleClick = () => {
+  if (scale.value > 1) {
+    scale.value = 1
+    posX.value = 0
+    posY.value = 0
+  } else {
+    scale.value = 1.8 // Nivel de zoom al hacer doble clic
+  }
+}
+
+// Zoom con la rueda del ratón (PC)
+const handleWheel = (e: WheelEvent) => {
+  e.preventDefault()
+  const zoomIntensity = 0.15
+  if (e.deltaY < 0) {
+    scale.value = Math.min(scale.value + zoomIntensity, 4) // Máximo zoom x4
+  } else {
+    scale.value = Math.max(scale.value - zoomIntensity, 1) // Mínimo zoom x1
+  }
+  if (scale.value === 1) {
+    posX.value = 0
+    posY.value = 0
+  }
+}
+
+// Arrastre con Mouse (PC)
+const startDrag = (e: MouseEvent) => {
+  if (scale.value === 1) return
+  isDragging.value = true
+  startX = e.clientX - posX.value
+  startY = e.clientY - posY.value
+}
+
+const onDrag = (e: MouseEvent) => {
+  if (!isDragging.value) return
+  posX.value = e.clientX - startX
+  posY.value = e.clientY - startY
+}
+
+const stopDrag = () => {
+  isDragging.value = false
+}
+
+// --- SOPORTE TÁCTIL PARA CELULARES ---
+const getDistance = (touches: TouchList) => {
+  return Math.hypot(
+    touches[0]!.clientX - touches[1]!.clientX,
+    touches[0]!.clientY - touches[1]!.clientY,
+  )
+}
+
+const handleTouchStart = (e: TouchEvent) => {
+  if (e.touches.length === 2) {
+    // Dos dedos: Preparar Zoom táctil (Pinch)
+    initialDistance = getDistance(e.touches)
+    initialScale = scale.value
+  } else if (e.touches.length === 1 && scale.value > 1) {
+    // Un dedo con zoom activo: Arrastrar imagen
+    isDragging.value = true
+    startX = e.touches[0]!.clientX - posX.value
+    startY = e.touches[0]!.clientY - posY.value
+  }
+}
+
+const handleTouchMove = (e: TouchEvent) => {
+  if (e.touches.length === 2) {
+    // Mover con dos dedos (Pinch to zoom)
+    e.preventDefault()
+    const currentDistance = getDistance(e.touches)
+    if (initialDistance > 0) {
+      const factor = currentDistance / initialDistance
+      scale.value = Math.min(Math.max(initialScale * factor, 1), 4)
+    }
+  } else if (e.touches.length === 1 && isDragging.value) {
+    // Mover con un dedo con zoom activo
+    posX.value = e.touches[0]!.clientX - startX
+    posY.value = e.touches[0]!.clientY - startY
+  }
+}
+
+const handleTouchEnd = () => {
+  isDragging.value = false
+  initialDistance = 0
+  if (scale.value === 1) {
+    posX.value = 0
+    posY.value = 0
+  }
+}
 
 const filteredItems = computed(() => {
   if (selectedCategory.value === 'Todos') {
-    return catalogItems;
+    return catalogItems
   }
-  return catalogItems.filter(item => item.category === selectedCategory.value);
-});
+  return catalogItems.filter((item) => item.category === selectedCategory.value)
+})
 
 onMounted(() => {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        // Se activa la animación al entrar a la vista
-        entry.target.classList.add('is-visible');
-      } else {
-        // Se remueve la clase al salir de la vista para que pueda
-        // volver a animarse cada vez que regreses o saltes con el menú
-        entry.target.classList.remove('is-visible');
-      }
-    });
-  }, { threshold: 0.1 });
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible')
+        } else {
+          entry.target.classList.remove('is-visible')
+        }
+      })
+    },
+    { threshold: 0.1 },
+  )
 
-  document.querySelectorAll('.animate-on-scroll').forEach(el => {
-    observer.observe(el);
-  });
-});
+  document.querySelectorAll('.animate-on-scroll').forEach((el) => {
+    observer.observe(el)
+  })
+})
 </script>
 
 <template>
@@ -39,7 +157,9 @@ onMounted(() => {
     <!-- Encabezado de la sección -->
     <div class="section-header">
       <h2 class="section-title animate-on-scroll">CATÁLOGO EXCLUSIVO</h2>
-      <p class="section-subtitle animate-on-scroll">Explora los drops seleccionados de la temporada</p>
+      <p class="section-subtitle animate-on-scroll">
+        Explora los drops seleccionados de la temporada
+      </p>
     </div>
 
     <!-- Botones de filtro interactivos -->
@@ -63,11 +183,12 @@ onMounted(() => {
         class="product-card animate-on-scroll"
         :style="{ transitionDelay: `${index * 0.1}s` }"
       >
-        <div class="product-image-wrapper">
+        <!-- Al hacer clic en la imagen se abre el modal de zoom -->
+        <div class="product-image-wrapper clickable-zoom" @click="openModal(item.image)">
           <img :src="item.image" :alt="item.title" class="product-img" />
           <span v-if="item.badge" class="product-badge">{{ item.badge }}</span>
           <div class="product-overlay-action">
-            <a href="#contacto" class="btn-quick-order">Separar por WhatsApp</a>
+            <span class="btn-zoom-preview">🔍 Ampliar Imagen</span>
           </div>
         </div>
 
@@ -76,8 +197,41 @@ onMounted(() => {
           <h3 class="product-title">{{ item.title }}</h3>
           <div class="product-footer">
             <span class="product-price">{{ item.price }}</span>
-            <span class="product-delivery">Envío seguro</span>
+            <a href="#contacto" class="btn-quick-order" @click.stop>Separar por WhatsApp</a>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- POPUP MODAL CON ZOOM INTEGRADO Y SOPORTE MÓVIL/PC -->
+    <div v-if="activeImage" class="image-modal-overlay" @click="closeModal">
+      <button class="close-modal-btn" @click="closeModal" aria-label="Cerrar">&times;</button>
+
+      <div
+        class="modal-zoom-container"
+        @click.stop
+        @dblclick="handleDoubleClick"
+        @wheel.prevent="handleWheel"
+        @mousedown="startDrag"
+        @mousemove="onDrag"
+        @mouseup="stopDrag"
+        @mouseleave="stopDrag"
+        @touchstart="handleTouchStart"
+        @touchmove="handleTouchMove"
+        @touchend="handleTouchEnd"
+      >
+        <img
+          :src="activeImage"
+          alt="Vista ampliada del producto"
+          class="modal-zoomed-img"
+          :style="{
+            transform: `translate(${posX}px, ${posY}px) scale(${scale})`,
+            cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in',
+          }"
+          @dragstart.prevent
+        />
+        <div class="zoom-instructions">
+          Usa la rueda del ratón o pellizca con dos dedos para hacer zoom 🔍
         </div>
       </div>
     </div>
@@ -192,7 +346,10 @@ onMounted(() => {
   border-radius: 20px;
   overflow: hidden;
   z-index: 2;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
+  transition:
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.4s ease;
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
@@ -211,6 +368,7 @@ onMounted(() => {
   height: 340px;
   overflow: hidden;
   background-color: #121620;
+  cursor: pointer;
 }
 
 .product-img {
@@ -241,7 +399,7 @@ onMounted(() => {
   z-index: 3;
 }
 
-/* Overlay deslizante original */
+/* Overlay deslizante original modificado para el zoom */
 .product-overlay-action {
   position: absolute;
   bottom: 0;
@@ -262,25 +420,21 @@ onMounted(() => {
   opacity: 1;
 }
 
-.btn-quick-order {
-  background: var(--grad-fresh, linear-gradient(135deg, #00f5a0 0%, #00d9f5 100%));
-  color: #0b0e14;
-  padding: 12px 26px;
+.btn-zoom-preview {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  padding: 10px 22px;
   border-radius: 99px;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 0.85rem;
-  text-decoration: none;
+  backdrop-filter: blur(6px);
   transform: translateY(15px);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 8px 25px rgba(0, 245, 160, 0.4);
 }
 
-.product-card:hover .btn-quick-order {
+.product-card:hover .btn-zoom-preview {
   transform: translateY(0);
-}
-
-.btn-quick-order:hover {
-  transform: translateY(-2px) scale(1.05);
 }
 
 .product-info {
@@ -313,6 +467,7 @@ onMounted(() => {
   align-items: center;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   padding-top: 15px;
+  gap: 10px;
 }
 
 .product-price {
@@ -321,17 +476,118 @@ onMounted(() => {
   color: var(--text-white, #ffffff);
 }
 
-.product-delivery {
-  font-size: 0.8rem;
+.btn-quick-order {
+  background: var(--grad-fresh, linear-gradient(135deg, #00f5a0 0%, #00d9f5 100%));
+  color: #0b0e14;
+  padding: 8px 16px;
+  border-radius: 99px;
+  font-weight: 800;
+  font-size: 0.75rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(0, 245, 160, 0.3);
+  white-space: nowrap;
+}
+
+.btn-quick-order:hover {
+  transform: scale(1.05);
+}
+
+/* --- ESTILOS DEL POPUP MODAL CON ZOOM --- */
+.image-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(5, 7, 10, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  overflow: hidden;
+  animation: fadeInModal 0.3s ease;
+}
+
+@keyframes fadeInModal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-zoom-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  touch-action: none; /* Evita comportamientos extraños de scroll en móvil al hacer zoom */
+}
+
+.modal-zoomed-img {
+  max-width: 85vw;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 16px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
+  transition: transform 0.08s ease-out;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.zoom-instructions {
+  position: absolute;
+  bottom: 25px;
+  background: rgba(14, 16, 23, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--text-soft, #9da3c0);
-  font-weight: 500;
+  padding: 8px 18px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+  letter-spacing: 0.5px;
+}
+
+.close-modal-btn {
+  position: absolute;
+  top: 25px;
+  right: 25px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10000;
+}
+
+.close-modal-btn:hover {
+  background: var(--accent-mint, #00f5a0);
+  color: #0b0e14;
+  border-color: transparent;
 }
 
 /* --- SISTEMA DE ANIMACIÓN SUAVE Y LENTA --- */
 .animate-on-scroll {
   opacity: 0;
   transform: translateY(40px);
-  transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1), transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+  transition:
+    opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1),
+    transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .animate-on-scroll.is-visible {
