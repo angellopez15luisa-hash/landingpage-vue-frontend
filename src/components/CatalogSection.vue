@@ -145,4 +145,22 @@ onMounted(() => {
 .btn-quick-order { background: linear-gradient(135deg, #00f5a0 0%, #00d9f5 100%); color: #0b0e14; padding: 8px 16px; border-radius: 99px; font-weight: 800; font-size: 0.75rem; text-decoration: none; }
 .animate-on-scroll { opacity: 0; transform: translateY(40px); transition: opacity 1.2s ease, transform 1.2s ease; }
 .animate-on-scroll.is-visible { opacity: 1; transform: translateY(0); }
+
+/* --- COMPORTAMIENTO TÁCTIL INSTANTÁNEO PARA EL BOTÓN EN MÓVIL --- */
+
+/* En celulares, hacemos que el contenedor detecte cuando se presiona la tarjeta (Active / Focus) */
+@media (hover: none) {
+  /* Cuando el usuario toca la tarjeta con el dedo, el botón aparece al instante */
+  .product-card:active .product-overlay-action,
+  .product-card:focus-within .product-overlay-action {
+    opacity: 1;
+  }
+}
+
+/* Forzamos que la transición de aparición sea inmediata en táctil para que no se sienta lento */
+@media (hover: none) {
+  .product-overlay-action {
+    transition: opacity 0.1s ease !important;
+  }
+}
 </style>
