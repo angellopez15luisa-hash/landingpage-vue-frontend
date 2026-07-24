@@ -72,7 +72,7 @@ const closeMenu = () => {
   font-weight: 900;
   font-size: 1.25rem;
   letter-spacing: -0.5px;
-  color: var(--text-white, #ffffff);
+  color: blue;
   text-transform: uppercase;
   display: flex;
   align-items: center;
