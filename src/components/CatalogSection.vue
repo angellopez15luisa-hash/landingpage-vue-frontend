@@ -7,12 +7,89 @@ const selectedCategory = ref('Todos')
 // Estado para controlar la imagen activa del Zoom/Modal
 const activeImage = ref<string | null>(null)
 
+// Estados de Zoom y Arrastre
+const zoomScale = ref(1)
+const translateX = ref(0)
+const translateY = ref(0)
+const isDragging = ref(false)
+const startX = ref(0)
+const startY = ref(0)
+
 const openModal = (imgUrl: string) => {
   activeImage.value = imgUrl
+  zoomScale.value = 1
+  translateX.value = 0
+  translateY.value = 0
 }
 
 const closeModal = () => {
   activeImage.value = null
+  zoomScale.value = 1
+  translateX.value = 0
+  translateY.value = 0
+}
+
+// Lógica de arrastre con Mouse
+const startDrag = (event: MouseEvent) => {
+  if (zoomScale.value === 1) return
+  isDragging.value = true
+  startX.value = event.clientX - translateX.value
+  startY.value = event.clientY - translateY.value
+}
+
+const onDrag = (event: MouseEvent) => {
+  if (!isDragging.value) return
+  translateX.value = event.clientX - startX.value
+  translateY.value = event.clientY - startY.value
+}
+
+// Lógica de arrastre táctil (Celulares / Tablets)
+const startDragTouch = (event: TouchEvent) => {
+  if (zoomScale.value === 1) return
+  if (event.touches.length === 1) {
+    isDragging.value = true
+    startX.value = event.touches[0]!.clientX - translateX.value
+    startY.value = event.touches[0]!.clientY - translateY.value
+  }
+}
+
+const onDragTouch = (event: TouchEvent) => {
+  if (!isDragging.value || event.touches.length !== 1) return
+  translateX.value = event.touches[0]!.clientX - startX.value
+  translateY.value = event.touches[0]!.clientY - translateY.value
+}
+
+const stopDrag = () => {
+  isDragging.value = false
+}
+
+// Zoom con la rueda del ratón
+const handleWheelZoom = (event: WheelEvent) => {
+  event.preventDefault()
+  const zoomIntensity = 0.15
+
+  if (event.deltaY < 0) {
+    zoomScale.value = Math.min(zoomScale.value + zoomIntensity, 4)
+  } else {
+    zoomScale.value = Math.max(zoomScale.value - zoomIntensity, 1)
+  }
+
+  // Si regresa al zoom original, resetea la posición
+  if (zoomScale.value === 1) {
+    translateX.value = 0
+    translateY.value = 0
+  }
+}
+
+// Doble clic para hacer zoom rápido o resetear
+const handleDoubleClick = () => {
+  if (zoomScale.value > 1) {
+    zoomScale.value = 1
+    translateX.value = 0
+    translateY.value = 0
+  } else {
+    zoomScale.value = 2.5
+  }
 }
 
 const filteredItems = computed(() => {
@@ -69,7 +146,6 @@ onMounted(() => {
     </div>
 
     <!-- Cuadrícula de productos -->
-    <!-- Cuadrícula de productos -->
     <div class="catalog-grid">
       <div
         v-for="(item, index) in filteredItems"
@@ -77,7 +153,6 @@ onMounted(() => {
         class="product-card animate-on-scroll"
         :style="{ transitionDelay: `${index * 0.1}s` }"
       >
-        <!-- Agregamos el @click y la clase aquí en el wrapper de la imagen -->
         <div class="product-image-wrapper clickable-zoom" @click="openModal(item.image)">
           <img :src="item.image" :alt="item.title" class="product-img" />
           <span v-if="item.badge" class="product-badge">{{ item.badge }}</span>
@@ -97,11 +172,34 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Modal / Visor de imagen en grande (Debe ir dentro del template principal) -->
+    <!-- Modal / Visor de imagen mejorado con Zoom y Arrastre Libre -->
     <div v-if="activeImage" class="image-modal-overlay" @click="closeModal">
-      <div class="image-modal-content" @click.stop>
-        <button class="close-modal-btn" @click="closeModal">&times;</button>
-        <img :src="activeImage" alt="Zoom del producto" class="zoomed-img" />
+      <!-- Botón de la X para cerrar -->
+      <button class="close-modal-btn" @click="closeModal" aria-label="Cerrar">&times;</button>
+
+      <div
+        class="image-modal-content zoom-wrapper"
+        :style="{
+          transform: `translate(${translateX}px, ${translateY}px) scale(${zoomScale})`,
+          cursor: zoomScale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'pointer'
+        }"
+        @click.stop
+        @wheel.prevent="handleWheelZoom"
+        @dblclick="handleDoubleClick"
+        @mousedown="startDrag"
+        @mousemove="onDrag"
+        @mouseup="stopDrag"
+        @mouseleave="stopDrag"
+        @touchstart="startDragTouch"
+        @touchmove="onDragTouch"
+        @touchend="stopDrag"
+      >
+        <img
+          :src="activeImage"
+          alt="Zoom del producto"
+          class="zoomed-img"
+          @dragstart.prevent
+        />
       </div>
     </div>
   </section>
@@ -240,9 +338,8 @@ onMounted(() => {
   transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* Cambia el cursor a lupa al pasar sobre la foto para indicar que interactúa */
 .clickable-zoom {
-  cursor: zoom-in;
+  cursor: pointer;
 }
 
 .product-card:hover .product-img {
@@ -280,10 +377,9 @@ onMounted(() => {
   opacity: 0;
   transition: opacity 0.3s ease;
   z-index: 2;
-  pointer-events: none; /* Evita que bloquee el clic de la imagen si está encima */
+  pointer-events: none;
 }
 
-/* Permitir clics cuando aparezca el overlay si fuera necesario, o dejar el zoom en la img directamente */
 .product-card:hover .product-overlay-action {
   opacity: 1;
   pointer-events: auto;
@@ -369,42 +465,45 @@ onMounted(() => {
   justify-content: center;
   z-index: 9999;
   padding: 20px;
+  overflow: hidden;
 }
 
-.image-modal-content {
-  position: relative;
-  max-width: 90vw;
-  max-height: 90vh;
+.zoom-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
+  transform-origin: center center;
+  will-change: transform;
 }
 
 .zoomed-img {
-  max-width: 100%;
+  max-width: 90vw;
   max-height: 85vh;
   object-fit: contain;
   border-radius: 16px;
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .close-modal-btn {
   position: absolute;
-  top: -45px;
-  right: 0;
+  top: 25px;
+  right: 25px;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #ffffff;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
+  z-index: 10000;
 }
 
 .close-modal-btn:hover {
