@@ -15,7 +15,7 @@ git add .
 
 3.-GUARDA ESTE NUEVO ESTADO COMO UN COMMIT
 ---------------------------------------------------
-git commt -m "Regresar el contenido a la version X"
+git commit -m "Regresar el contenido a la version X"
 
 4.-SUBE LOS CAMBIOS A GITHUB
 ---------------------------------------------------
