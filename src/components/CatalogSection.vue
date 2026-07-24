@@ -4,12 +4,8 @@ import { catalogCategories, catalogItems } from '@/data/catalog.data'
 import VueEasyLightbox from 'vue-easy-lightbox'
 
 const selectedCategory = ref('Todos')
-const isTouchDevice = ref(false)
 
 onMounted(() => {
-  // Detecta si es un dispositivo táctil
-  isTouchDevice.value = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
@@ -84,11 +80,8 @@ const filteredItems = computed(() => {
           <img :src="item.image" :alt="item.title" class="product-img" />
           <span v-if="item.badge" class="product-badge">{{ item.badge }}</span>
 
-          <!-- ESTILO EN LÍNEA DINÁMICO: Si es móvil, la opacidad es 1 por fuerza bruta de JavaScript -->
-          <div
-            class="product-overlay-action"
-            :style="isTouchDevice ? { opacity: '1 !important', background: 'rgba(11, 14, 20, 0.45)' } : {}"
-          >
+          <!-- Botón con comportamiento adaptable sin fallas -->
+          <div class="product-overlay-action">
             <span class="btn-zoom-preview">🔍 Ampliar Imagen</span>
           </div>
         </div>
@@ -139,17 +132,19 @@ const filteredItems = computed(() => {
 .product-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
 .product-badge { position: absolute; top: 15px; left: 15px; background: rgba(11, 14, 20, 0.85); border: 1px solid rgba(0, 245, 160, 0.3); color: #00f5a0; padding: 5px 14px; border-radius: 99px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; z-index: 3; }
 
-/* Por defecto en PC se oculta */
+/*
+  ESTILO BASE: Por defecto el botón está VISIBLE (para móviles y pantallas generales).
+  De esta forma evitamos que se oculte por culpa de reglas de hover malinterpretadas.
+*/
 .product-overlay-action {
   position: absolute;
   inset: 0;
-  background: rgba(11, 14, 20, 0.45);
+  background: rgba(11, 14, 20, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2;
-  opacity: 0;
-  transition: opacity 0.3s ease;
+  opacity: 1; /* Visible por defecto */
 }
 
 .btn-zoom-preview {
@@ -171,7 +166,15 @@ const filteredItems = computed(() => {
 .animate-on-scroll { opacity: 0; transform: translateY(40px); transition: opacity 1.2s ease, transform 1.2s ease; }
 .animate-on-scroll.is-visible { opacity: 1; transform: translateY(0); }
 
-@media (hover: hover) {
+/*
+  SOLO EN COMPUTADORAS (DONDE SÍ HAY MOUSE REAL):
+  Invertimos la lógica: ocultamos el botón por defecto y hacemos que aparezca al hacer hover.
+*/
+@media (pointer: fine) {
+  .product-overlay-action {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
   .product-card:hover .product-overlay-action {
     opacity: 1;
   }
