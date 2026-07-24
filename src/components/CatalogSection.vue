@@ -144,15 +144,20 @@ onMounted(() => {
 .animate-on-scroll { opacity: 0; transform: translateY(40px); transition: opacity 1.2s ease, transform 1.2s ease; }
 .animate-on-scroll.is-visible { opacity: 1; transform: translateY(0); }
 
-/* --- OPTIMIZACIÓN MÓVIL SIN RETRASOS --- */
+/* --- FORZAR VISIBILIDAD PERMANENTE EN MÓVIL --- */
 @media (hover: none) {
-  .product-overlay-action {
+  /* Anulamos la opacidad cero global para que esté fijo */
+  .product-image-wrapper .product-overlay-action {
     opacity: 1 !important;
-    background: rgba(11, 14, 20, 0.4);
-    backdrop-filter: blur(2px);
+    background: rgba(11, 14, 20, 0.45) !important;
+    backdrop-filter: blur(2px) !important;
+    visibility: visible !important;
+    transition: none !important;
   }
-  .btn-zoom-preview {
+
+  .product-image-wrapper .btn-zoom-preview {
     transform: translateY(0) !important;
+    transition: none !important;
   }
 }
 </style>
