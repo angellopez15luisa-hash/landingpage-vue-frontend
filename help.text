@@ -1,0 +1,22 @@
+PERMITE VER EL HSTORIAL DE VERSIONES
+-------------------------------------
+git log --oneline
+
+REGRESAR TU PROYECTO A LA VERSION X MANTENENDO GUARDADO EL COMMIT ACTUAL
+------------------------------------------------------------------
+
+1.-TRAE LOS ARCHIVOS DE LA VERSION X A TU PANTALLA
+-------------------------------------------------
+git checkout x -- .
+
+2.-PREPARA LOS CAMBIOS
+--------------------------------------------------
+git add .
+
+3.-GUARDA ESTE NUEVO ESTADO COMO UN COMMIT
+---------------------------------------------------
+git commt -m "Regresar el contenido a la version X"
+
+4.-SUBE LOS CAMBIOS A GITHUB
+---------------------------------------------------
+git push origin main
