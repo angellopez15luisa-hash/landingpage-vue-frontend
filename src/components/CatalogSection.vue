@@ -1,138 +1,48 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { catalogCategories, catalogItems } from '@/data/catalog.data'
+import { ref, computed, onMounted } from 'vue';
+import { catalogCategories, catalogItems } from '@/data/catalog.data';
 
-const selectedCategory = ref('Todos')
-
-// Estado para controlar la imagen activa del Zoom/Modal
-const activeImage = ref<string | null>(null)
-
-// Estados de Zoom y Arrastre
-const zoomScale = ref(1)
-const translateX = ref(0)
-const translateY = ref(0)
-const isDragging = ref(false)
-const startX = ref(0)
-const startY = ref(0)
-
-const openModal = (imgUrl: string) => {
-  activeImage.value = imgUrl
-  zoomScale.value = 1
-  translateX.value = 0
-  translateY.value = 0
-}
-
-const closeModal = () => {
-  activeImage.value = null
-  zoomScale.value = 1
-  translateX.value = 0
-  translateY.value = 0
-}
-
-// Lógica de arrastre con Mouse
-const startDrag = (event: MouseEvent) => {
-  if (zoomScale.value === 1) return
-  isDragging.value = true
-  startX.value = event.clientX - translateX.value
-  startY.value = event.clientY - translateY.value
-}
-
-const onDrag = (event: MouseEvent) => {
-  if (!isDragging.value) return
-  translateX.value = event.clientX - startX.value
-  translateY.value = event.clientY - startY.value
-}
-
-// Lógica de arrastre táctil (Celulares / Tablets)
-const startDragTouch = (event: TouchEvent) => {
-  if (zoomScale.value === 1) return
-  if (event.touches.length === 1) {
-    isDragging.value = true
-    startX.value = event.touches[0]!.clientX - translateX.value
-    startY.value = event.touches[0]!.clientY - translateY.value
-  }
-}
-
-const onDragTouch = (event: TouchEvent) => {
-  if (!isDragging.value || event.touches.length !== 1) return
-  translateX.value = event.touches[0]!.clientX - startX.value
-  translateY.value = event.touches[0]!.clientY - translateY.value
-}
-
-const stopDrag = () => {
-  isDragging.value = false
-}
-
-// Zoom con la rueda del ratón
-const handleWheelZoom = (event: WheelEvent) => {
-  event.preventDefault()
-  const zoomIntensity = 0.15
-
-  if (event.deltaY < 0) {
-    zoomScale.value = Math.min(zoomScale.value + zoomIntensity, 4)
-  } else {
-    zoomScale.value = Math.max(zoomScale.value - zoomIntensity, 1)
-  }
-
-  // Si regresa al zoom original, resetea la posición
-  if (zoomScale.value === 1) {
-    translateX.value = 0
-    translateY.value = 0
-  }
-}
-
-// Doble clic para hacer zoom rápido o resetear
-const handleDoubleClick = () => {
-  if (zoomScale.value > 1) {
-    zoomScale.value = 1
-    translateX.value = 0
-    translateY.value = 0
-  } else {
-    zoomScale.value = 2.5
-  }
-}
+const selectedCategory = ref('Todos');
 
 const filteredItems = computed(() => {
   if (selectedCategory.value === 'Todos') {
-    return catalogItems
+    return catalogItems;
   }
-  return catalogItems.filter((item) => item.category === selectedCategory.value)
-})
+  return catalogItems.filter(item => item.category === selectedCategory.value);
+});
 
 onMounted(() => {
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-visible')
-        } else {
-          entry.target.classList.remove('is-visible')
-        }
-      })
-    },
-    { threshold: 0.1 },
-  )
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        // Se activa la animación al entrar a la vista
+        entry.target.classList.add('is-visible');
+      } else {
+        // Se remueve la clase al salir de la vista para que pueda
+        // volver a animarse cada vez que regreses o saltes con el menú
+        entry.target.classList.remove('is-visible');
+      }
+    });
+  }, { threshold: 0.1 });
 
-  document.querySelectorAll('.animate-on-scroll').forEach((el) => {
-    observer.observe(el)
-  })
-})
+  document.querySelectorAll('.animate-on-scroll').forEach(el => {
+    observer.observe(el);
+  });
+});
 </script>
 
 <template>
   <section class="catalog-container" id="catalogo">
-    <!-- Degradado ambiental sutil -->
+    <!-- Degradado ambiental sutil y profundo idéntico al resto de secciones -->
     <div class="section-ambient-glow"></div>
 
     <!-- Encabezado de la sección -->
     <div class="section-header">
       <h2 class="section-title animate-on-scroll">CATÁLOGO EXCLUSIVO</h2>
-      <p class="section-subtitle animate-on-scroll">
-        Explora los drops seleccionados de la temporada
-      </p>
+      <p class="section-subtitle animate-on-scroll">Explora los drops seleccionados de la temporada</p>
     </div>
 
-    <!-- Botones de filtro -->
+    <!-- Botones de filtro interactivos -->
     <div class="catalog-filters animate-on-scroll">
       <button
         v-for="category in catalogCategories"
@@ -145,7 +55,7 @@ onMounted(() => {
       </button>
     </div>
 
-    <!-- Cuadrícula de productos -->
+    <!-- Cuadrícula de productos con animaciones y efectos originales -->
     <div class="catalog-grid">
       <div
         v-for="(item, index) in filteredItems"
@@ -153,11 +63,11 @@ onMounted(() => {
         class="product-card animate-on-scroll"
         :style="{ transitionDelay: `${index * 0.1}s` }"
       >
-        <div class="product-image-wrapper clickable-zoom" @click="openModal(item.image)">
+        <div class="product-image-wrapper">
           <img :src="item.image" :alt="item.title" class="product-img" />
           <span v-if="item.badge" class="product-badge">{{ item.badge }}</span>
           <div class="product-overlay-action">
-            <a href="#contacto" class="btn-quick-order" @click.stop>Separar por WhatsApp</a>
+            <a href="#contacto" class="btn-quick-order">Separar por WhatsApp</a>
           </div>
         </div>
 
@@ -171,42 +81,11 @@ onMounted(() => {
         </div>
       </div>
     </div>
-
-    <!-- Modal / Visor de imagen mejorado con Zoom y Arrastre Libre -->
-    <div v-if="activeImage" class="image-modal-overlay" @click="closeModal">
-      <!-- Botón de la X para cerrar -->
-      <button class="close-modal-btn" @click="closeModal" aria-label="Cerrar">&times;</button>
-
-      <div
-        class="image-modal-content zoom-wrapper"
-        :style="{
-          transform: `translate(${translateX}px, ${translateY}px) scale(${zoomScale})`,
-          cursor: zoomScale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'pointer'
-        }"
-        @click.stop
-        @wheel.prevent="handleWheelZoom"
-        @dblclick="handleDoubleClick"
-        @mousedown="startDrag"
-        @mousemove="onDrag"
-        @mouseup="stopDrag"
-        @mouseleave="stopDrag"
-        @touchstart="startDragTouch"
-        @touchmove="onDragTouch"
-        @touchend="stopDrag"
-      >
-        <img
-          :src="activeImage"
-          alt="Zoom del producto"
-          class="zoomed-img"
-          @dragstart.prevent
-        />
-      </div>
-    </div>
   </section>
 </template>
 
 <style scoped>
-/* --- ESTILOS GENERALES DEL CATÁLOGO --- */
+/* --- CONTENEDOR GENERAL DEL CATÁLOGO --- */
 .catalog-container {
   position: relative;
   width: 100%;
@@ -219,6 +98,7 @@ onMounted(() => {
   overflow: hidden;
 }
 
+/* Resplandor ambiental idéntico para mantener coherencia visual */
 .section-ambient-glow {
   position: absolute;
   top: 0;
@@ -232,6 +112,7 @@ onMounted(() => {
   z-index: 1;
 }
 
+/* Encabezado */
 .section-header {
   text-align: center;
   margin-bottom: 40px;
@@ -254,6 +135,7 @@ onMounted(() => {
   font-weight: 500;
 }
 
+/* --- FILTROS DE CATEGORÍA --- */
 .catalog-filters {
   display: flex;
   justify-content: center;
@@ -290,6 +172,7 @@ onMounted(() => {
   box-shadow: 0 6px 20px rgba(0, 245, 160, 0.3);
 }
 
+/* --- CUADRÍCULA DE PRODUCTOS --- */
 .catalog-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -299,6 +182,7 @@ onMounted(() => {
   z-index: 2;
 }
 
+/* Tarjeta individual con efectos originales y fondo oscuro optimizado */
 .product-card {
   position: relative;
   background: rgba(14, 16, 23, 0.85);
@@ -308,10 +192,7 @@ onMounted(() => {
   border-radius: 20px;
   overflow: hidden;
   z-index: 2;
-  transition:
-    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.4s ease;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
@@ -323,6 +204,7 @@ onMounted(() => {
   box-shadow: 0 20px 50px rgba(0, 245, 160, 0.15);
 }
 
+/* Imagen y zoom original */
 .product-image-wrapper {
   position: relative;
   width: 100%;
@@ -336,10 +218,6 @@ onMounted(() => {
   height: 100%;
   object-fit: cover;
   transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
-}
-
-.clickable-zoom {
-  cursor: pointer;
 }
 
 .product-card:hover .product-img {
@@ -363,6 +241,7 @@ onMounted(() => {
   z-index: 3;
 }
 
+/* Overlay deslizante original */
 .product-overlay-action {
   position: absolute;
   bottom: 0;
@@ -377,12 +256,10 @@ onMounted(() => {
   opacity: 0;
   transition: opacity 0.3s ease;
   z-index: 2;
-  pointer-events: none;
 }
 
 .product-card:hover .product-overlay-action {
   opacity: 1;
-  pointer-events: auto;
 }
 
 .btn-quick-order {
@@ -450,75 +327,11 @@ onMounted(() => {
   font-weight: 500;
 }
 
-/* --- ESTILOS DEL MODAL / ZOOM FLOTANTE --- */
-.image-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(5, 7, 10, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 20px;
-  overflow: hidden;
-}
-
-.zoom-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform-origin: center center;
-  will-change: transform;
-}
-
-.zoomed-img {
-  max-width: 90vw;
-  max-height: 85vh;
-  object-fit: contain;
-  border-radius: 16px;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
-.close-modal-btn {
-  position: absolute;
-  top: 25px;
-  right: 25px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  font-size: 1.8rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  z-index: 10000;
-}
-
-.close-modal-btn:hover {
-  background: var(--accent-mint, #00f5a0);
-  color: #0b0e14;
-  border-color: transparent;
-}
-
-/* --- SISTEMA DE ANIMACIÓN --- */
+/* --- SISTEMA DE ANIMACIÓN SUAVE Y LENTA --- */
 .animate-on-scroll {
   opacity: 0;
   transform: translateY(40px);
-  transition:
-    opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1),
-    transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1), transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .animate-on-scroll.is-visible {
