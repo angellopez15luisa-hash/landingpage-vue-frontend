@@ -5,6 +5,20 @@ import VueEasyLightbox from 'vue-easy-lightbox'
 
 const selectedCategory = ref('Todos')
 
+// Estado para saber qué tarjeta está siendo tocada en el móvil
+const activeCardId = ref<number | null>(null);
+
+const handleTouchStartCard = (id: number) => {
+  activeCardId.value = id;
+};
+
+const handleTouchEndCard = () => {
+  // Opcional: si quieres que el botón se quede visible un momento o se oculte al soltar
+  setTimeout(() => {
+    activeCardId.value = null;
+  }, 1500); // Se oculta a los 1.5 segundos de soltar, o puedes quitar el timeout si prefieres
+};
+
 // Estados para vue-easy-lightbox
 const visibleRef = ref(false)
 const imgsRef = ref<string[]>([])
@@ -70,14 +84,17 @@ onMounted(() => {
       </button>
     </div>
 
-    <div class="catalog-grid">
+  <div class="catalog-grid">
       <div
         v-for="(item, index) in filteredItems"
         :key="item.id"
         class="product-card animate-on-scroll"
+        :class="{ 'touch-active': activeCardId === item.id }"
         :style="{ transitionDelay: `${index * 0.1}s` }"
+        @touchstart="handleTouchStartCard(item.id)"
+        @touchend="handleTouchEndCard"
       >
-        <!-- Al hacer clic llama a la función que abre el lightbox -->
+        <!-- Tu contenido actual de la tarjeta... -->
         <div class="product-image-wrapper clickable-zoom" @click="showSingleImage(item.image)">
           <img :src="item.image" :alt="item.title" class="product-img" />
           <span v-if="item.badge" class="product-badge">{{ item.badge }}</span>
@@ -85,15 +102,7 @@ onMounted(() => {
             <span class="btn-zoom-preview">🔍 Ampliar Imagen</span>
           </div>
         </div>
-
-        <div class="product-info">
-          <span class="product-category">{{ item.category }}</span>
-          <h3 class="product-title">{{ item.title }}</h3>
-          <div class="product-footer">
-            <span class="product-price">{{ item.price }}</span>
-            <a href="#contacto" class="btn-quick-order" @click.stop>Separar por WhatsApp</a>
-          </div>
-        </div>
+        <!-- Resto del código... -->
       </div>
     </div>
 
@@ -146,21 +155,11 @@ onMounted(() => {
 .animate-on-scroll { opacity: 0; transform: translateY(40px); transition: opacity 1.2s ease, transform 1.2s ease; }
 .animate-on-scroll.is-visible { opacity: 1; transform: translateY(0); }
 
-/* --- COMPORTAMIENTO TÁCTIL INSTANTÁNEO PARA EL BOTÓN EN MÓVIL --- */
-
-/* En celulares, hacemos que el contenedor detecte cuando se presiona la tarjeta (Active / Focus) */
+ /* Forzar aparición instantánea en móviles mediante la clase de Vue */
 @media (hover: none) {
-  /* Cuando el usuario toca la tarjeta con el dedo, el botón aparece al instante */
-  .product-card:active .product-overlay-action,
-  .product-card:focus-within .product-overlay-action {
-    opacity: 1;
-  }
-}
-
-/* Forzamos que la transición de aparición sea inmediata en táctil para que no se sienta lento */
-@media (hover: none) {
-  .product-overlay-action {
-    transition: opacity 0.1s ease !important;
+  .product-card.touch-active .product-overlay-action {
+    opacity: 1 !important;
+    transition: opacity 0.05s ease !important; /* Cero retraso */
   }
 }
 </style>
