@@ -5,20 +5,6 @@ import VueEasyLightbox from 'vue-easy-lightbox'
 
 const selectedCategory = ref('Todos')
 
-// Estado para saber qué tarjeta está siendo tocada en el móvil
-const activeCardId = ref<number | null>(null);
-
-const handleTouchStartCard = (id: number) => {
-  activeCardId.value = id;
-};
-
-const handleTouchEndCard = () => {
-  // Opcional: si quieres que el botón se quede visible un momento o se oculte al soltar
-  setTimeout(() => {
-    activeCardId.value = null;
-  }, 1500); // Se oculta a los 1.5 segundos de soltar, o puedes quitar el timeout si prefieres
-};
-
 // Estados para vue-easy-lightbox
 const visibleRef = ref(false)
 const imgsRef = ref<string[]>([])
@@ -84,17 +70,13 @@ onMounted(() => {
       </button>
     </div>
 
-  <div class="catalog-grid">
+    <div class="catalog-grid">
       <div
         v-for="(item, index) in filteredItems"
         :key="item.id"
         class="product-card animate-on-scroll"
-        :class="{ 'touch-active': activeCardId === item.id }"
         :style="{ transitionDelay: `${index * 0.1}s` }"
-        @touchstart="handleTouchStartCard(item.id)"
-        @touchend="handleTouchEndCard"
       >
-        <!-- Tu contenido actual de la tarjeta... -->
         <div class="product-image-wrapper clickable-zoom" @click="showSingleImage(item.image)">
           <img :src="item.image" :alt="item.title" class="product-img" />
           <span v-if="item.badge" class="product-badge">{{ item.badge }}</span>
@@ -102,7 +84,15 @@ onMounted(() => {
             <span class="btn-zoom-preview">🔍 Ampliar Imagen</span>
           </div>
         </div>
-        <!-- Resto del código... -->
+
+        <div class="product-info">
+          <span class="product-category">{{ item.category }}</span>
+          <h3 class="product-title">{{ item.title }}</h3>
+          <div class="product-footer">
+            <span class="product-price">{{ item.price }}</span>
+            <a href="#contacto" class="btn-quick-order" @click.stop>Separar por WhatsApp</a>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -112,7 +102,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* --- (Mantén todos tus estilos actuales de CSS aquí abajo intactos) --- */
 .catalog-container {
   position: relative;
   width: 100%;
@@ -139,7 +128,7 @@ onMounted(() => {
 .filter-btn.active { background: linear-gradient(135deg, #00f5a0 0%, #00d9f5 100%); color: #0b0e14; border-color: transparent; }
 .catalog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; width: 100%; max-width: 1200px; z-index: 2; }
 .product-card { position: relative; background: rgba(14, 16, 23, 0.85); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 20px; overflow: hidden; z-index: 2; display: flex; flex-direction: column; transition: transform 0.4s ease; }
-.product-image-wrapper { position: relative; width: 100%; height: 340px; overflow: hidden; background-color: #121620; cursor: pointer; }
+.product-image-wrapper { position: relative; width: 100%; height: 340px; overflow: hidden; background-color: #121620; cursor: pointer; touch-action: manipulation; }
 .product-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
 .product-card:hover .product-img { transform: scale(1.08); }
 .product-badge { position: absolute; top: 15px; left: 15px; background: rgba(11, 14, 20, 0.85); border: 1px solid rgba(0, 245, 160, 0.3); color: #00f5a0; padding: 5px 14px; border-radius: 99px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; z-index: 3; }
@@ -155,16 +144,13 @@ onMounted(() => {
 .animate-on-scroll { opacity: 0; transform: translateY(40px); transition: opacity 1.2s ease, transform 1.2s ease; }
 .animate-on-scroll.is-visible { opacity: 1; transform: translateY(0); }
 
-/* --- BOTÓN VISIBLE Y SIN DEMORAS EN MÓVIL --- */
+/* --- OPTIMIZACIÓN MÓVIL SIN RETRASOS --- */
 @media (hover: none) {
-  /* En celulares mostramos el botón de forma fija y elegante para evitar esperas */
   .product-overlay-action {
     opacity: 1 !important;
-    background: rgba(11, 14, 20, 0.45); /* Un fondo semitransparente para que no tape toda la foto */
+    background: rgba(11, 14, 20, 0.4);
     backdrop-filter: blur(2px);
   }
-
-  /* Aseguramos que el botón no tenga animación de desplazamiento lenta en móvil */
   .btn-zoom-preview {
     transform: translateY(0) !important;
   }
