@@ -155,11 +155,18 @@ onMounted(() => {
 .animate-on-scroll { opacity: 0; transform: translateY(40px); transition: opacity 1.2s ease, transform 1.2s ease; }
 .animate-on-scroll.is-visible { opacity: 1; transform: translateY(0); }
 
- /* Forzar aparición instantánea en móviles mediante la clase de Vue */
+/* --- BOTÓN VISIBLE Y SIN DEMORAS EN MÓVIL --- */
 @media (hover: none) {
-  .product-card.touch-active .product-overlay-action {
+  /* En celulares mostramos el botón de forma fija y elegante para evitar esperas */
+  .product-overlay-action {
     opacity: 1 !important;
-    transition: opacity 0.05s ease !important; /* Cero retraso */
+    background: rgba(11, 14, 20, 0.45); /* Un fondo semitransparente para que no tape toda la foto */
+    backdrop-filter: blur(2px);
+  }
+
+  /* Aseguramos que el botón no tenga animación de desplazamiento lenta en móvil */
+  .btn-zoom-preview {
+    transform: translateY(0) !important;
   }
 }
 </style>
