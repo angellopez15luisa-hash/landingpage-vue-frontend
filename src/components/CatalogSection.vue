@@ -1,48 +1,61 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { catalogCategories, catalogItems } from '@/data/catalog.data';
+import { ref, computed, onMounted } from 'vue'
+import { catalogCategories, catalogItems } from '@/data/catalog.data'
 
-const selectedCategory = ref('Todos');
+const selectedCategory = ref('Todos')
+
+// Estado para controlar la imagen activa del Zoom/Modal
+const activeImage = ref<string | null>(null)
+
+const openModal = (imgUrl: string) => {
+  activeImage.value = imgUrl
+}
+
+const closeModal = () => {
+  activeImage.value = null
+}
 
 const filteredItems = computed(() => {
   if (selectedCategory.value === 'Todos') {
-    return catalogItems;
+    return catalogItems
   }
-  return catalogItems.filter(item => item.category === selectedCategory.value);
-});
+  return catalogItems.filter((item) => item.category === selectedCategory.value)
+})
 
 onMounted(() => {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        // Se activa la animación al entrar a la vista
-        entry.target.classList.add('is-visible');
-      } else {
-        // Se remueve la clase al salir de la vista para que pueda
-        // volver a animarse cada vez que regreses o saltes con el menú
-        entry.target.classList.remove('is-visible');
-      }
-    });
-  }, { threshold: 0.1 });
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible')
+        } else {
+          entry.target.classList.remove('is-visible')
+        }
+      })
+    },
+    { threshold: 0.1 },
+  )
 
-  document.querySelectorAll('.animate-on-scroll').forEach(el => {
-    observer.observe(el);
-  });
-});
+  document.querySelectorAll('.animate-on-scroll').forEach((el) => {
+    observer.observe(el)
+  })
+})
 </script>
 
 <template>
   <section class="catalog-container" id="catalogo">
-    <!-- Degradado ambiental sutil y profundo idéntico al resto de secciones -->
+    <!-- Degradado ambiental sutil -->
     <div class="section-ambient-glow"></div>
 
     <!-- Encabezado de la sección -->
     <div class="section-header">
       <h2 class="section-title animate-on-scroll">CATÁLOGO EXCLUSIVO</h2>
-      <p class="section-subtitle animate-on-scroll">Explora los drops seleccionados de la temporada</p>
+      <p class="section-subtitle animate-on-scroll">
+        Explora los drops seleccionados de la temporada
+      </p>
     </div>
 
-    <!-- Botones de filtro interactivos -->
+    <!-- Botones de filtro -->
     <div class="catalog-filters animate-on-scroll">
       <button
         v-for="category in catalogCategories"
@@ -55,7 +68,8 @@ onMounted(() => {
       </button>
     </div>
 
-    <!-- Cuadrícula de productos con animaciones y efectos originales -->
+    <!-- Cuadrícula de productos -->
+    <!-- Cuadrícula de productos -->
     <div class="catalog-grid">
       <div
         v-for="(item, index) in filteredItems"
@@ -63,11 +77,12 @@ onMounted(() => {
         class="product-card animate-on-scroll"
         :style="{ transitionDelay: `${index * 0.1}s` }"
       >
-        <div class="product-image-wrapper">
+        <!-- Agregamos el @click y la clase aquí en el wrapper de la imagen -->
+        <div class="product-image-wrapper clickable-zoom" @click="openModal(item.image)">
           <img :src="item.image" :alt="item.title" class="product-img" />
           <span v-if="item.badge" class="product-badge">{{ item.badge }}</span>
           <div class="product-overlay-action">
-            <a href="#contacto" class="btn-quick-order">Separar por WhatsApp</a>
+            <a href="#contacto" class="btn-quick-order" @click.stop>Separar por WhatsApp</a>
           </div>
         </div>
 
@@ -81,11 +96,19 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- Modal / Visor de imagen en grande (Debe ir dentro del template principal) -->
+    <div v-if="activeImage" class="image-modal-overlay" @click="closeModal">
+      <div class="image-modal-content" @click.stop>
+        <button class="close-modal-btn" @click="closeModal">&times;</button>
+        <img :src="activeImage" alt="Zoom del producto" class="zoomed-img" />
+      </div>
+    </div>
   </section>
 </template>
 
 <style scoped>
-/* --- CONTENEDOR GENERAL DEL CATÁLOGO --- */
+/* --- ESTILOS GENERALES DEL CATÁLOGO --- */
 .catalog-container {
   position: relative;
   width: 100%;
@@ -98,7 +121,6 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* Resplandor ambiental idéntico para mantener coherencia visual */
 .section-ambient-glow {
   position: absolute;
   top: 0;
@@ -112,7 +134,6 @@ onMounted(() => {
   z-index: 1;
 }
 
-/* Encabezado */
 .section-header {
   text-align: center;
   margin-bottom: 40px;
@@ -135,7 +156,6 @@ onMounted(() => {
   font-weight: 500;
 }
 
-/* --- FILTROS DE CATEGORÍA --- */
 .catalog-filters {
   display: flex;
   justify-content: center;
@@ -172,7 +192,6 @@ onMounted(() => {
   box-shadow: 0 6px 20px rgba(0, 245, 160, 0.3);
 }
 
-/* --- CUADRÍCULA DE PRODUCTOS --- */
 .catalog-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -182,7 +201,6 @@ onMounted(() => {
   z-index: 2;
 }
 
-/* Tarjeta individual con efectos originales y fondo oscuro optimizado */
 .product-card {
   position: relative;
   background: rgba(14, 16, 23, 0.85);
@@ -192,7 +210,10 @@ onMounted(() => {
   border-radius: 20px;
   overflow: hidden;
   z-index: 2;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
+  transition:
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.4s ease;
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
@@ -204,7 +225,6 @@ onMounted(() => {
   box-shadow: 0 20px 50px rgba(0, 245, 160, 0.15);
 }
 
-/* Imagen y zoom original */
 .product-image-wrapper {
   position: relative;
   width: 100%;
@@ -218,6 +238,11 @@ onMounted(() => {
   height: 100%;
   object-fit: cover;
   transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Cambia el cursor a lupa al pasar sobre la foto para indicar que interactúa */
+.clickable-zoom {
+  cursor: zoom-in;
 }
 
 .product-card:hover .product-img {
@@ -241,7 +266,6 @@ onMounted(() => {
   z-index: 3;
 }
 
-/* Overlay deslizante original */
 .product-overlay-action {
   position: absolute;
   bottom: 0;
@@ -256,10 +280,13 @@ onMounted(() => {
   opacity: 0;
   transition: opacity 0.3s ease;
   z-index: 2;
+  pointer-events: none; /* Evita que bloquee el clic de la imagen si está encima */
 }
 
+/* Permitir clics cuando aparezca el overlay si fuera necesario, o dejar el zoom en la img directamente */
 .product-card:hover .product-overlay-action {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .btn-quick-order {
@@ -327,11 +354,72 @@ onMounted(() => {
   font-weight: 500;
 }
 
-/* --- SISTEMA DE ANIMACIÓN SUAVE Y LENTA --- */
+/* --- ESTILOS DEL MODAL / ZOOM FLOTANTE --- */
+.image-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(5, 7, 10, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.image-modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zoomed-img {
+  max-width: 100%;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 16px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.close-modal-btn {
+  position: absolute;
+  top: -45px;
+  right: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.close-modal-btn:hover {
+  background: var(--accent-mint, #00f5a0);
+  color: #0b0e14;
+  border-color: transparent;
+}
+
+/* --- SISTEMA DE ANIMACIÓN --- */
 .animate-on-scroll {
   opacity: 0;
   transform: translateY(40px);
-  transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1), transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+  transition:
+    opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1),
+    transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .animate-on-scroll.is-visible {
