@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-// import { heroSlides } from '@/data/hero.data'
 import { GeneralSettingAction } from '@/business/actions/general-setting.action'
-import { useQuery } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { HeroSectionAction } from '@/business/actions/hero-section.action'
+import { io, Socket } from 'socket.io-client'
+
+// 1. Instanciamos el queryClient para invalidar la caché
+const queryClient = useQueryClient()
+let socket: Socket | null = null
 
 // Índice reactivo del slide actual
 const currentSlide = ref(0)
@@ -22,7 +26,9 @@ const { data: heroSections } = useQuery({
 })
 
 const nextSlide = () => {
-  currentSlide.value = (currentSlide.value + 1) % heroSections.value!.length
+  if (heroSections.value && heroSections.value.length > 0) {
+    currentSlide.value = (currentSlide.value + 1) % heroSections.value.length
+  }
 }
 
 const goToSlide = (index: number) => {
@@ -37,10 +43,26 @@ const startInterval = () => {
 
 onMounted(() => {
   startInterval()
+
+  // 2. Conexión al socket usando la variable de entorno de tu API URL (o tu puerto de backend)
+  // Asegúrate de que la URL apunte a la raíz de tu backend (sin el /api si el socket corre en el puerto general)
+  socket = io(import.meta.env.VITE_API_URL || 'http://localhost:4700')
+
+  // 3. Escuchamos el evento que emite tu backend cuando cambian los hero sections
+  // (Cambia 'hero-changed' por el nombre del evento exacto que configuraste en tu backend)
+  socket.on('hero-section', (data) => {
+    console.log('[Socket] Cambio detectado en Hero:', data)
+    // Invalidamos la query para que TanStack traiga los nuevos datos automáticamente
+    queryClient.invalidateQueries({ queryKey: ['hero-sections'] })
+  })
 })
 
 onUnmounted(() => {
   if (slideInterval) clearInterval(slideInterval)
+  // 4. Desconectamos el socket al desmontar el componente para evitar fugas de memoria
+  if (socket) {
+    socket.disconnect()
+  }
 })
 </script>
 
@@ -56,15 +78,6 @@ onUnmounted(() => {
       >
         <img :src="slide.imagePath" alt="Streetwear Collection" />
       </div>
-
-      <!-- <div
-        v-for="(slide, index) in heroSlides"
-        :key="index"
-        class="slide"
-        :class="{ active: currentSlide === index }"
-      >
-        <img :src="slide.image" alt="Streetwear Collection" />
-      </div> -->
     </div>
 
     <!-- Capas de sombra y brillo de fondo -->
@@ -72,15 +85,15 @@ onUnmounted(() => {
     <div class="hero-glow"></div>
 
     <!-- Contenido principal alineado idéntico a la referencia -->
-    <div class="hero-content" v-if="heroSections">
-      <span class="drop-tag animate-text">{{ heroSections[currentSlide]!.tag }}</span>
+    <div class="hero-content" v-if="heroSections && heroSections.length > 0">
+      <span class="drop-tag animate-text">{{ heroSections[currentSlide]?.tag }}</span>
 
       <h1 class="hero-title animate-text">
-        {{  heroSections[currentSlide]?.title }} <span class="highlight-line">{{  heroSections[currentSlide]?.highlightText }}</span>
+        {{ heroSections[currentSlide]?.title }} <span class="highlight-line">{{ heroSections[currentSlide]?.highlightText }}</span>
       </h1>
 
       <p class="hero-description animate-text">
-        {{  heroSections[currentSlide]?.description }}
+        {{ heroSections[currentSlide]?.description }}
       </p>
 
       <a href="#catalogo" class="btn-main-action animate-text">{{
@@ -89,7 +102,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Puntos indicadores de navegación inferiores -->
-    <div class="slider-nav">
+    <div class="slider-nav" v-if="heroSections">
       <div
         v-for="(value, index) in heroSections"
         :key="value.id"
@@ -102,7 +115,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* --- CONTENEDOR GENERAL DEL HERO --- */
+/* --- Tus estilos originales se mantienen exactamente igual --- */
 .hero-slider-container {
   position: relative;
   width: 100%;
@@ -114,7 +127,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* --- PISTA DE IMÁGENES --- */
 .slider-track {
   position: absolute;
   top: 0;
@@ -152,7 +164,6 @@ onUnmounted(() => {
   transform: scale(1.12);
 }
 
-/* --- CAPAS DECORATIVAS --- */
 .hero-overlay {
   position: absolute;
   top: 0;
@@ -189,7 +200,6 @@ onUnmounted(() => {
   filter: blur(80px);
 }
 
-/* --- CONTENIDO DE TEXTO --- */
 .hero-content {
   position: relative;
   z-index: 3;
@@ -206,18 +216,10 @@ onUnmounted(() => {
   animation: fadeInUp 0.8s forwards ease-out;
 }
 
-.drop-tag.animate-text {
-  animation-delay: 0.1s;
-}
-.hero-title.animate-text {
-  animation-delay: 0.2s;
-}
-.hero-description.animate-text {
-  animation-delay: 0.3s;
-}
-.btn-main-action.animate-text {
-  animation-delay: 0.4s;
-}
+.drop-tag.animate-text { animation-delay: 0.1s; }
+.hero-title.animate-text { animation-delay: 0.2s; }
+.hero-description.animate-text { animation-delay: 0.3s; }
+.btn-main-action.animate-text { animation-delay: 0.4s; }
 
 @keyframes fadeInUp {
   to {
@@ -226,7 +228,6 @@ onUnmounted(() => {
   }
 }
 
-/* Etiqueta superior con borde y fondo oscuro translúcido */
 .drop-tag {
   display: inline-flex;
   align-items: center;
@@ -245,7 +246,6 @@ onUnmounted(() => {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
-/* Título principal idéntico a la referencia (Robusto y con salto en A PEDIDO) */
 .hero-title {
   font-size: clamp(2.3rem, 5.5vw, 4.8rem);
   font-weight: 900;
@@ -265,7 +265,6 @@ onUnmounted(() => {
   -webkit-text-fill-color: transparent;
 }
 
-/* Descripción sutil */
 .hero-description {
   font-size: clamp(0.9rem, 1.5vw, 1.1rem);
   color: var(--text-soft, #d0d5ed);
@@ -275,7 +274,6 @@ onUnmounted(() => {
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
 }
 
-/* Botón principal cyan/menta con sombra difusa */
 .btn-main-action {
   position: relative;
   background: var(--grad-fresh, linear-gradient(135deg, #00f5a0 0%, #00d9f5 100%));
@@ -296,7 +294,6 @@ onUnmounted(() => {
   box-shadow: 0 12px 35px rgba(0, 245, 160, 0.5);
 }
 
-/* --- INDICADORES INFERIORES --- */
 .slider-nav {
   position: absolute;
   bottom: 35px;
