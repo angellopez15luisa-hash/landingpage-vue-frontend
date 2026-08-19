@@ -48,7 +48,7 @@ onMounted(() => {
   // Asegúrate de que la URL apunte a la raíz de tu backend (sin el /api si el socket corre en el puerto general)
   // socket = io(import.meta.env.VITE_API_URL || 'http://localhost:4700')
 
-  socket = io('https://landingpage-admin-backend.onrender.com', {
+  socket = io('https://landingpage-admin-backend-production.up.railway.app', {
   transports: ['polling', 'websocket'], // Obliga a iniciar por HTTP polling que es más tolerante
   reconnection: true,                  // Permite reintentar si Render está despertando
   reconnectionAttempts: 5,             // Intentos máximos
