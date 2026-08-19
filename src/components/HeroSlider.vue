@@ -46,7 +46,14 @@ onMounted(() => {
 
   // 2. Conexión al socket usando la variable de entorno de tu API URL (o tu puerto de backend)
   // Asegúrate de que la URL apunte a la raíz de tu backend (sin el /api si el socket corre en el puerto general)
-  socket = io(import.meta.env.VITE_API_URL || 'http://localhost:4700')
+  // socket = io(import.meta.env.VITE_API_URL || 'http://localhost:4700')
+
+  socket = io('https://landingpage-admin-backend.onrender.com', {
+  transports: ['polling', 'websocket'], // Obliga a iniciar por HTTP polling que es más tolerante
+  reconnection: true,                  // Permite reintentar si Render está despertando
+  reconnectionAttempts: 5,             // Intentos máximos
+  reconnectionDelay: 2000,             // Espera 2 segundos entre cada intento
+})
 
   // 3. Escuchamos el evento que emite tu backend cuando cambian los hero sections
   // (Cambia 'hero-changed' por el nombre del evento exacto que configuraste en tu backend)
