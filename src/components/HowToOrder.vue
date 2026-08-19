@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { orderSteps } from '@/data/order.data';
+import { useQuery } from "@tanstack/vue-query";
+import { GeneralSettingAction } from "@/business/actions/general-setting.action";
+
+const { data: generalSetting } = useQuery({
+  queryKey: ['general-setting'],
+  queryFn: () => GeneralSettingAction.get(),
+  retry: false,
+})
+
 
 onMounted(() => {
   const observer = new IntersectionObserver((entries) => {
@@ -28,8 +37,8 @@ onMounted(() => {
 
     <!-- Encabezado de la sección -->
     <div class="section-header">
-      <h2 class="section-title animate-on-scroll">¿CÓMO REALIZAR TU PEDIDO?</h2>
-      <p class="section-subtitle animate-on-scroll">Proceso sencillo en 3 pasos</p>
+      <h2 class="section-title animate-on-scroll">{{ generalSetting?.textTitleOrderStep }}</h2>
+      <p class="section-subtitle animate-on-scroll">{{ generalSetting?.textSubtitleOrderStep }}</p>
     </div>
 
     <!-- Contenedor de las tarjetas de pasos -->
