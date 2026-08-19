@@ -1,12 +1,12 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts">
-import { GeneralSettingAction } from "@/business/actions/general-setting.action"
-import { useQuery } from "@tanstack/vue-query"
+import { GeneralSettingAction } from '@/business/actions/general-setting.action'
+import { useQuery } from '@tanstack/vue-query'
 import { ref } from 'vue'
 // Estado reactivo para controlar el menú móvil
 const isMenuOpen = ref<boolean>(false)
 
-  const { data: generalSetting } = useQuery({
+const { data: generalSetting } = useQuery({
   queryKey: ['general-setting'],
   queryFn: () => GeneralSettingAction.get(),
   retry: false,
@@ -44,8 +44,9 @@ const closeMenu = () => {
         <li><a href="#faq" @click="closeMenu">Preguntas</a></li>
         <li><a href="#contacto" @click="closeMenu">Contacto</a></li>
       </ul>
-      {{ generalSetting?.textHrefNavbar}}
-      <a href="https://wa.me/51999999999" target="_blank" class="btn-island-ws"> {{ generalSetting?.textButtonNavbar }} </a>
+      <a :href="generalSetting?.textHrefNavbar" target="_blank" class="btn-island-ws">
+        {{ generalSetting?.textButtonNavbar }}
+      </a>
     </nav>
   </div>
 </template>
