@@ -44,7 +44,7 @@ const closeMenu = () => {
         <li><a href="#faq" @click="closeMenu">Preguntas</a></li>
         <li><a href="#contacto" @click="closeMenu">Contacto</a></li>
       </ul>
-
+      {{ }}
       <a href="https://wa.me/51999999999" target="_blank" class="btn-island-ws"> {{ generalSetting?.textButtonNavbar }} </a>
     </nav>
   </div>
