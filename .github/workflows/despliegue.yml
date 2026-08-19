@@ -37,3 +37,4 @@ jobs:
         server-dir: ./public_html/landing/  # 👈 Subcarpeta segura para no pisar a tu amigo
         port: 21
         passive: true
+        dangerous-clean-slot: true 
