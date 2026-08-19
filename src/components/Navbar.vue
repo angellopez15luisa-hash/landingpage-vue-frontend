@@ -1,7 +1,7 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts">
 import { GeneralSettingAction } from '@/business/actions/general-setting.action'
-import { ItemSectionAction } from '@/business/actions/item-section.action'
+import { ItemSectionAction } from "@/business/actions/item-section.action"
 import { useQuery } from '@tanstack/vue-query'
 import { ref } from 'vue'
 // Estado reactivo para controlar el menú móvil
@@ -45,11 +45,8 @@ const closeMenu = () => {
         <span></span>
       </button>
       <ul class="menu-items" :class="{ active: isMenuOpen }">
-        <li>
-          <a :href="item.href" @click="closeMenu" v-for="item in itemSections" :key="item.id">{{
-            item.text
-          }}</a>
-        </li>
+
+         <li  v-for="item in itemSections" :key="item.id" ><a :href="item.href" @click="closeMenu" >{{ item.text }}</a></li>
         <!-- <li><a href="#catalogo" @click="closeMenu">Catalogo</a></li>
         <li><a href="#opiniones" @click="closeMenu">Opiniones</a></li>
         <li><a href="#faq" @click="closeMenu">Preguntas</a></li>
