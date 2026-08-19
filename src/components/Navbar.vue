@@ -32,15 +32,18 @@ const closeMenu = () => {
 
 onMounted(() => {
   const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
   socket = io(SOCKET_URL, {
-    transports: ['polling', 'websocket'], // Obliga a iniciar por HTTP polling que es más tolerante
-    reconnection: true, // Permite reintentar si Render está despertando
-    reconnectionAttempts: 5, // Intentos máximos
-    reconnectionDelay: 2000, // Espera 2 segundos entre cada intento
+    transports: ['polling', 'websocket'],
+    reconnection: true,
   })
+
+  socket.on('connect', () => {
+    console.log('✅ Navbar conectado al socket con ID:', socket?.id)
+  })
+
   socket.on('emit-general-setting', (data) => {
-    console.log('[Socket] Cambio detectado en navbar:', data)
-    // Invalidamos la query para que TanStack traiga los nuevos datos automáticamente
+    console.log('🎯 ¡Evento recibido en la Navbar!', data)
     queryClient.invalidateQueries({ queryKey: ['general-setting'] })
   })
 })
