@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import { orderSteps } from '@/data/order.data';
-import { useQuery } from "@tanstack/vue-query";
-import { GeneralSettingAction } from "@/business/actions/general-setting.action";
+import { nextTick, watch } from 'vue'
+import { useQuery } from '@tanstack/vue-query'
+import { GeneralSettingAction } from '@/business/actions/general-setting.action'
+import { OrderStepAction } from '@/business/actions/order-step.action'
 
 const { data: generalSetting } = useQuery({
   queryKey: ['general-setting'],
@@ -10,24 +10,45 @@ const { data: generalSetting } = useQuery({
   retry: false,
 })
 
+const { data: orderSteps } = useQuery({
+  queryKey: ['order-steps'],
+  queryFn: () => OrderStepAction.getAll(),
+  retry: false,
+})
 
-onMounted(() => {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        // Se activa la animación al entrar a la vista
-        entry.target.classList.add('is-visible');
-      } else {
-        // Se remueve la clase al salir para que se repita al volver a entrar o usar el menú
-        entry.target.classList.remove('is-visible');
-      }
-    });
-  }, { threshold: 0.1 });
+const initObserver = async () => {
+  await nextTick()
 
-  document.querySelectorAll('.animate-on-scroll').forEach(el => {
-    observer.observe(el);
-  });
-});
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible')
+        } else {
+          entry.target.classList.remove('is-visible')
+        }
+      })
+    },
+    { threshold: 0.1 },
+  )
+
+  // Observamos tanto las tarjetas como los elementos generales con animación
+  document.querySelectorAll('.howto-animate-scroll, .animate-on-scroll').forEach((el) => {
+    observer.observe(el)
+  })
+}
+
+// Observamos cuando cualquiera de las dos datas esté lista
+watch(
+  [orderSteps, generalSetting],
+  ([steps, settings]) => {
+    if ((steps && steps.length > 0) || settings) {
+      initObserver()
+    }
+  },
+  { immediate: true },
+)
+
 </script>
 
 <template>
@@ -45,8 +66,8 @@ onMounted(() => {
     <div class="steps-grid">
       <div
         v-for="(step, index) in orderSteps"
-        :key="index"
-        class="step-card animate-on-scroll"
+        :key="step.id"
+        class="step-card howto-animate-scroll"
         :style="{ transitionDelay: `${index * 0.15}s` }"
       >
         <div class="card-glow"></div>
@@ -131,7 +152,10 @@ onMounted(() => {
   padding: 45px 35px;
   overflow: hidden;
   z-index: 2;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
+  transition:
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.4s ease;
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
 }
 
@@ -191,10 +215,25 @@ onMounted(() => {
 .animate-on-scroll {
   opacity: 0;
   transform: translateY(40px);
-  transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1), transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+  transition:
+    opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1),
+    transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .animate-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.howto-animate-scroll {
+  opacity: 0;
+  transform: translateY(40px);
+  transition:
+    opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1),
+    transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.howto-animate-scroll.is-visible {
   opacity: 1;
   transform: translateY(0);
 }
