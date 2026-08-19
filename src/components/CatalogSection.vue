@@ -2,6 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { catalogCategories, catalogItems } from '@/data/catalog.data'
 import VueEasyLightbox from 'vue-easy-lightbox'
+import { useQuery } from "@tanstack/vue-query"
+import { GeneralSettingAction } from "@/business/actions/general-setting.action"
 
 const selectedCategory = ref('Todos')
 
@@ -9,6 +11,12 @@ const selectedCategory = ref('Todos')
 const visibleRef = ref(false)
 const imgsRef = ref<string[]>([])
 const indexRef = ref(0)
+
+const { data: generalSetting } = useQuery({
+  queryKey: ['general-setting'],
+  queryFn: () => GeneralSettingAction.get(),
+  retry: false,
+})
 
 const showSingleImage = (imgUrl: string) => {
   imgsRef.value = [imgUrl]
@@ -52,9 +60,9 @@ onMounted(() => {
     <div class="section-ambient-glow"></div>
 
     <div class="section-header">
-      <h2 class="section-title animate-on-scroll">CATÁLOGO EXCLUSIVO</h2>
+      <h2 class="section-title animate-on-scroll">{{ generalSetting?.textTitleCatalogItem }}</h2>
       <p class="section-subtitle animate-on-scroll">
-        Explora los drops seleccionados de la temporada
+         {{ generalSetting?.textSubtitleCatalogItem }}
       </p>
     </div>
 
