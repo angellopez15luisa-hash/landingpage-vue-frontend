@@ -47,13 +47,13 @@ onMounted(() => {
   // 2. Conexión al socket usando la variable de entorno de tu API URL (o tu puerto de backend)
   // Asegúrate de que la URL apunte a la raíz de tu backend (sin el /api si el socket corre en el puerto general)
   // socket = io(import.meta.env.VITE_API_URL || 'http://localhost:4700')
-
-  socket = io(import.meta.env.VITE_API_URL.replace(/\/api\/?$/, ''), {
-  transports: ['polling', 'websocket'], // Obliga a iniciar por HTTP polling que es más tolerante
-  reconnection: true,                  // Permite reintentar si Render está despertando
-  reconnectionAttempts: 5,             // Intentos máximos
-  reconnectionDelay: 2000,             // Espera 2 segundos entre cada intento
-})
+  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+  socket = io(SOCKET_URL, {
+    transports: ['polling', 'websocket'], // Obliga a iniciar por HTTP polling que es más tolerante
+    reconnection: true, // Permite reintentar si Render está despertando
+    reconnectionAttempts: 5, // Intentos máximos
+    reconnectionDelay: 2000, // Espera 2 segundos entre cada intento
+  })
 
   // 3. Escuchamos el evento que emite tu backend cuando cambian los hero sections
   // (Cambia 'hero-changed' por el nombre del evento exacto que configuraste en tu backend)
@@ -96,7 +96,8 @@ onUnmounted(() => {
       <span class="drop-tag animate-text">{{ heroSections[currentSlide]?.tag }}</span>
 
       <h1 class="hero-title animate-text">
-        {{ heroSections[currentSlide]?.title }} <span class="highlight-line">{{ heroSections[currentSlide]?.highlightText }}</span>
+        {{ heroSections[currentSlide]?.title }}
+        <span class="highlight-line">{{ heroSections[currentSlide]?.highlightText }}</span>
       </h1>
 
       <p class="hero-description animate-text">
@@ -223,10 +224,18 @@ onUnmounted(() => {
   animation: fadeInUp 0.8s forwards ease-out;
 }
 
-.drop-tag.animate-text { animation-delay: 0.1s; }
-.hero-title.animate-text { animation-delay: 0.2s; }
-.hero-description.animate-text { animation-delay: 0.3s; }
-.btn-main-action.animate-text { animation-delay: 0.4s; }
+.drop-tag.animate-text {
+  animation-delay: 0.1s;
+}
+.hero-title.animate-text {
+  animation-delay: 0.2s;
+}
+.hero-description.animate-text {
+  animation-delay: 0.3s;
+}
+.btn-main-action.animate-text {
+  animation-delay: 0.4s;
+}
 
 @keyframes fadeInUp {
   to {
