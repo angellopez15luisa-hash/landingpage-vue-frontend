@@ -30,7 +30,7 @@ const closeMenu = () => {
         <span></span>
       </button>
       <ul class="menu-items" :class="{ active: isMenuOpen }">
-        <li><a href="#como-pedir" @click="closeMenu">¿Como pedir 2?</a></li>
+        <li><a href="#como-pedir" @click="closeMenu">¿Como pedir?</a></li>
         <li><a href="#catalogo" @click="closeMenu">Catalogo</a></li>
         <li><a href="#opiniones" @click="closeMenu">Opiniones</a></li>
         <li><a href="#faq" @click="closeMenu">Preguntas</a></li>
