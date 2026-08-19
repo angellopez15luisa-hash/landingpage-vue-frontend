@@ -38,7 +38,7 @@ onMounted(() => {
     reconnectionAttempts: 5, // Intentos máximos
     reconnectionDelay: 2000, // Espera 2 segundos entre cada intento
   })
-  socket.on('general-setting', (data) => {
+  socket.on('emit-general-setting', (data) => {
     console.log('[Socket] Cambio detectado en navbar:', data)
     // Invalidamos la query para que TanStack traiga los nuevos datos automáticamente
     queryClient.invalidateQueries({ queryKey: ['general-setting'] })
