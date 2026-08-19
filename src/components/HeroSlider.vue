@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { heroSlides } from '@/data/hero.data'
-import { GeneralSettingAction } from "@/business/actions/general-setting.action"
-import { useQuery } from "@tanstack/vue-query"
+// import { heroSlides } from '@/data/hero.data'
+import { GeneralSettingAction } from '@/business/actions/general-setting.action'
+import { useQuery } from '@tanstack/vue-query'
+import { HeroSectionAction } from '@/business/actions/hero-section.action'
 
 // Índice reactivo del slide actual
 const currentSlide = ref(0)
@@ -14,8 +15,14 @@ const { data: generalSetting } = useQuery({
   retry: false,
 })
 
+const { data: heroSections } = useQuery({
+  queryKey: ['hero-sections'],
+  queryFn: () => HeroSectionAction.getAll(),
+  retry: false,
+})
+
 const nextSlide = () => {
-  currentSlide.value = (currentSlide.value + 1) % heroSlides.length
+  currentSlide.value = (currentSlide.value + 1) % heroSections.value!.length
 }
 
 const goToSlide = (index: number) => {
@@ -42,13 +49,22 @@ onUnmounted(() => {
     <!-- Pista de imágenes rotativas -->
     <div class="slider-track">
       <div
+        v-for="(slide, index) in heroSections"
+        :key="slide.id"
+        class="slide"
+        :class="{ active: currentSlide === index }"
+      >
+        <img :src="slide.imagePath" alt="Streetwear Collection" />
+      </div>
+
+      <!-- <div
         v-for="(slide, index) in heroSlides"
         :key="index"
         class="slide"
         :class="{ active: currentSlide === index }"
       >
         <img :src="slide.image" alt="Streetwear Collection" />
-      </div>
+      </div> -->
     </div>
 
     <!-- Capas de sombra y brillo de fondo -->
@@ -56,25 +72,27 @@ onUnmounted(() => {
     <div class="hero-glow"></div>
 
     <!-- Contenido principal alineado idéntico a la referencia -->
-    <div class="hero-content" v-if="heroSlides[currentSlide]">
-      <span class="drop-tag animate-text">{{ heroSlides[currentSlide]!.tag }}</span>
+    <div class="hero-content" v-if="heroSections">
+      <span class="drop-tag animate-text">{{ heroSections[currentSlide]!.tag }}</span>
 
       <h1 class="hero-title animate-text">
-        ROPA EXCLUSIVA <span class="highlight-line">A PEDIDO</span>
+        {{  heroSections[currentSlide]?.title }} <span class="highlight-line">{{  heroSections[currentSlide]?.highlightText }}</span>
       </h1>
 
       <p class="hero-description animate-text">
-        {{ heroSlides[currentSlide]!.description }}
+        {{  heroSections[currentSlide]?.description }}
       </p>
 
-      <a href="#catalogo" class="btn-main-action animate-text">{{ generalSetting?.textButtonHeroSection }}</a>
+      <a href="#catalogo" class="btn-main-action animate-text">{{
+        generalSetting?.textButtonHeroSection
+      }}</a>
     </div>
 
     <!-- Puntos indicadores de navegación inferiores -->
     <div class="slider-nav">
       <div
-        v-for="(_, index) in heroSlides"
-        :key="index"
+        v-for="(value, index) in heroSections"
+        :key="value.id"
         class="slider-dot"
         :class="{ active: currentSlide === index }"
         @click="goToSlide(index)"
