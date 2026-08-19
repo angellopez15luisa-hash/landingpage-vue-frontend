@@ -1,8 +1,16 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts">
+import { GeneralSettingAction } from "@/business/actions/general-setting.action"
+import { useQuery } from "@tanstack/vue-query"
 import { ref } from 'vue'
 // Estado reactivo para controlar el menú móvil
 const isMenuOpen = ref<boolean>(false)
+
+  const { data: generalSetting } = useQuery({
+  queryKey: ['general-setting'],
+  queryFn: () => GeneralSettingAction.get(),
+  retry: false,
+})
 
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value
@@ -17,7 +25,7 @@ const closeMenu = () => {
   <div class="header-fixed">
     <nav class="island-nav">
       <a href="#inicio" class="brand-logo-link">
-        <div class="brand-logo">DROP·ZONE</div>
+        <div class="brand-logo">{{ generalSetting?.textNameCompany }}</div>
       </a>
       <button
         class="menu-toggle"
