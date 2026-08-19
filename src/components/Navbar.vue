@@ -1,13 +1,13 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { GeneralSettingAction } from '@/business/actions/general-setting.action'
 import { ItemSectionAction } from '@/business/actions/item-section.action'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { io, Socket } from 'socket.io-client'
 // Estado reactivo para controlar el menú móvil
 const isMenuOpen = ref<boolean>(false)
-  const queryClient = useQueryClient()
+const queryClient = useQueryClient()
 let socket: Socket | null = null
 
 const { data: generalSetting } = useQuery({
@@ -38,11 +38,18 @@ onMounted(() => {
     reconnectionAttempts: 5, // Intentos máximos
     reconnectionDelay: 2000, // Espera 2 segundos entre cada intento
   })
-   socket.on('general-setting', (data) => {
-    console.log('[Socket] Cambio detectado en Hero:', data)
+  socket.on('general-setting', (data) => {
+    console.log('[Socket] Cambio detectado en navbar:', data)
     // Invalidamos la query para que TanStack traiga los nuevos datos automáticamente
     queryClient.invalidateQueries({ queryKey: ['general-setting'] })
   })
+})
+
+onUnmounted(() => {
+  // 4. Desconectamos el socket al desmontar el componente para evitar fugas de memoria
+  if (socket) {
+    socket.disconnect()
+  }
 })
 </script>
 
