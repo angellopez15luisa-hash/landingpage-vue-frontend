@@ -25,7 +25,7 @@ const closeMenu = () => {
   <div class="header-fixed">
     <nav class="island-nav">
       <a href="#inicio" class="brand-logo-link">
-        <div class="brand-logo">{{ generalSetting?.textNameCompany }}</div>
+        <div class="brand-logo">{{ generalSetting?.textNameCompany }} www</div>
       </a>
       <button
         class="menu-toggle"
