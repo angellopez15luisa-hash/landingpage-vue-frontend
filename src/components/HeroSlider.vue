@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { heroSlides } from '@/data/hero.data'
+import { GeneralSettingAction } from "@/business/actions/general-setting.action"
+import { useQuery } from "@tanstack/vue-query"
 
 // Índice reactivo del slide actual
 const currentSlide = ref(0)
 let slideInterval: number | null = null
+
+const { data: generalSetting } = useQuery({
+  queryKey: ['general-setting'],
+  queryFn: () => GeneralSettingAction.get(),
+  retry: false,
+})
 
 const nextSlide = () => {
   currentSlide.value = (currentSlide.value + 1) % heroSlides.length
@@ -59,7 +67,7 @@ onUnmounted(() => {
         {{ heroSlides[currentSlide]!.description }}
       </p>
 
-      <a href="#catalogo" class="btn-main-action animate-text">VER DROP DE LA SEMANA</a>
+      <a href="#catalogo" class="btn-main-action animate-text">{{ generalSetting?.textButtonHeroSection }}</a>
     </div>
 
     <!-- Puntos indicadores de navegación inferiores -->
