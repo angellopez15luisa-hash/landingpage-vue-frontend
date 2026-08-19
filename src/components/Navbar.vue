@@ -1,11 +1,14 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import { GeneralSettingAction } from '@/business/actions/general-setting.action'
 import { ItemSectionAction } from '@/business/actions/item-section.action'
-import { useQuery } from '@tanstack/vue-query'
-import { ref } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { io, Socket } from 'socket.io-client'
 // Estado reactivo para controlar el menú móvil
 const isMenuOpen = ref<boolean>(false)
+  const queryClient = useQueryClient()
+let socket: Socket | null = null
 
 const { data: generalSetting } = useQuery({
   queryKey: ['general-setting'],
@@ -26,6 +29,21 @@ const toggleMenu = () => {
 const closeMenu = () => {
   isMenuOpen.value = false
 }
+
+onMounted(() => {
+  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+  socket = io(SOCKET_URL, {
+    transports: ['polling', 'websocket'], // Obliga a iniciar por HTTP polling que es más tolerante
+    reconnection: true, // Permite reintentar si Render está despertando
+    reconnectionAttempts: 5, // Intentos máximos
+    reconnectionDelay: 2000, // Espera 2 segundos entre cada intento
+  })
+   socket.on('general-setting', (data) => {
+    console.log('[Socket] Cambio detectado en Hero:', data)
+    // Invalidamos la query para que TanStack traiga los nuevos datos automáticamente
+    queryClient.invalidateQueries({ queryKey: ['general-setting'] })
+  })
+})
 </script>
 
 <template>
