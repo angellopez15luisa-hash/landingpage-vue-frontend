@@ -85,18 +85,18 @@ const filteredItems = computed(() => {
 })
 
 // Observamos catalogCategories y cuando tenga datos, buscamos el isDefault
-watch(
-  () => catalogCategories.value,
-  (categories) => {
-    if (categories && categories.length > 0) {
-      const defaultItem = categories.find((item) => item.isDefault)
-      if (defaultItem) {
-        selectedCategory.value = defaultItem.id
-      }
-    }
-  },
-  { immediate: true }
-)
+// watch(
+//   () => catalogCategories.value,
+//   (categories) => {
+//     if (categories && categories.length > 0) {
+//       const defaultItem = categories.find((item) => item.isDefault)
+//       if (defaultItem) {
+//         selectedCategory.value = defaultItem.id
+//       }
+//     }
+//   },
+//   { immediate: true }
+// )
 
 onMounted(() => {
   const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
