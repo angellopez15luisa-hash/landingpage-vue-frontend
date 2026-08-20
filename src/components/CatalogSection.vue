@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { catalogCategories, catalogItems } from '@/data/catalog.data'
 import VueEasyLightbox from 'vue-easy-lightbox'
-import { useQuery } from "@tanstack/vue-query"
-import { GeneralSettingAction } from "@/business/actions/general-setting.action"
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { GeneralSettingAction } from '@/business/actions/general-setting.action'
+import { CatalogCategoryAction } from '@/business/actions/catalog-category.action'
+import { io, Socket } from 'socket.io-client'
 
-const selectedCategory = ref('Todos')
+const queryClient = useQueryClient()
+let socket: Socket | null = null
+
+const selectedCategory = ref<number>(0)
 
 // Estados para vue-easy-lightbox
 const visibleRef = ref(false)
@@ -15,6 +20,12 @@ const indexRef = ref(0)
 const { data: generalSetting } = useQuery({
   queryKey: ['general-setting'],
   queryFn: () => GeneralSettingAction.get(),
+  retry: false,
+})
+
+const { data: catalogCategories } = useQuery({
+  queryKey: ['catalog-categories'],
+  queryFn: () => CatalogCategoryAction.getAll(),
   retry: false,
 })
 
@@ -35,7 +46,39 @@ const filteredItems = computed(() => {
   return catalogItems.filter((item) => item.category === selectedCategory.value)
 })
 
+// Observamos catalogCategories y cuando tenga datos, buscamos el isDefault
+watch(
+  catalogCategories,
+  (categories) => {
+    if (categories && categories.length > 0) {
+      const defaultItem = categories.find((item) => item.isDefault)
+      if (defaultItem) {
+        selectedCategory.value = defaultItem.id
+      }
+    }
+  },
+  { immediate: true }, // { immediate: true } hace que se ejecute apenas el componente se monta por si la data ya estuviera en caché
+)
+
 onMounted(() => {
+  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
+  socket = io(SOCKET_URL, {
+    transports: ['polling', 'websocket'],
+    reconnection: true,
+  })
+
+  socket.on('general-setting', (data) => {
+    console.log('🎯 ¡Evento recibido en la Navbar!', data)
+    queryClient.invalidateQueries({ queryKey: ['general-setting'] })
+  })
+
+  socket.on('catalog-category', (data) => {
+    console.log('🎯 ¡Evento recibido en la Navbar!', data)
+    queryClient.invalidateQueries({ queryKey: ['catalog-categories'] })
+    // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
+  })
+
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
@@ -62,21 +105,22 @@ onMounted(() => {
     <div class="section-header">
       <h2 class="section-title animate-on-scroll">{{ generalSetting?.textTitleCatalogItem }}</h2>
       <p class="section-subtitle animate-on-scroll">
-         {{ generalSetting?.textSubtitleCatalogItem }}
+        {{ generalSetting?.textSubtitleCatalogItem }}
       </p>
     </div>
 
     <!-- Contenedor con mayor ancho para permitir ~8 o más botones por fila -->
     <div class="catalog-filters animate-on-scroll">
-      <button
-        v-for="category in catalogCategories"
-        :key="category"
-        class="filter-btn"
-        :class="{ active: selectedCategory === category }"
-        @click="selectedCategory = category"
-      >
-        {{ category }}
-      </button>
+      <template v-for="category in catalogCategories" :key="category.id">
+        <button
+          v-if="category.isActive"
+          class="filter-btn"
+          :class="{ active: selectedCategory === category.id }"
+          @click="selectedCategory = category.id"
+        >
+          {{ category.text }}
+        </button>
+      </template>
     </div>
 
     <div class="catalog-grid">

@@ -38,11 +38,7 @@ onMounted(() => {
     reconnection: true,
   })
 
-  // socket.on('connect', () => {
-  //   console.log('✅ Navbar conectado al socket con ID:', socket?.id)
-  // })
-
-  socket.on('general-setting', (data) => {
+    socket.on('general-setting', (data) => {
     console.log('🎯 ¡Evento recibido en la Navbar!', data)
     queryClient.invalidateQueries({ queryKey: ['general-setting'] })
     // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
