@@ -81,15 +81,13 @@ const selectedCategory = computed({
 const filteredItems = computed(() => {
   if (!catalogItems.value) return []
 
-  const currentId = selectedCategory.value
-
-  // Si es 0 o vacío, mostramos todo
-  if (!currentId || currentId === 0 || currentId === '') {
+  // Si es 0, muestra todo
+  if (selectedCategory.value === 0) {
     return catalogItems.value
   }
 
   return catalogItems.value.filter((item) => {
-    return String(item.catalogCategoryId) === String(currentId)
+    return String(item.catalogCategoryId) === String(selectedCategory.value)
   })
 })
 
