@@ -72,11 +72,11 @@ onMounted(() => {
     // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
   })
 
-  // socket.on('item-sections', (data) => {
-  //   console.log('🎯 ¡Evento recibido en la Navbar!', data)
-  //   queryClient.invalidateQueries({ queryKey: ['item-sections'] })
-  //   // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
-  // })
+  socket.on('order-steps', (data) => {
+    console.log('🎯 ¡Evento recibido en la Navbar!', data)
+    queryClient.invalidateQueries({ queryKey: ['order-steps'] })
+    // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
+  })
 })
 
 onUnmounted(() => {
