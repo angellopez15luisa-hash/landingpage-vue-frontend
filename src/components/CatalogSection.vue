@@ -10,8 +10,7 @@ import { CatalogItemAction } from '../business/actions/catalog-item.action';
 
 const queryClient = useQueryClient()
 let socket: Socket | null = null
-
-const selectedCategory = ref<number | string>(0)
+const userSelectedCategory = ref<number | string | null>(null)
 
 // Estados para vue-easy-lightbox
 const visibleRef = ref(false)
@@ -52,17 +51,36 @@ const showSingleImage = (imgUrl: string) => {
 const onHide = () => {
   visibleRef.value = false
 }
+// 2. Computed con getter y setter: si el usuario no ha hecho clic, busca el isDefault automáticamente de la caché
+const selectedCategory = computed({
+  get: () => {
+    if (userSelectedCategory.value !== null) {
+      return userSelectedCategory.value
+    }
+    const categories = catalogCategories.value
+    if (categories && categories.length > 0) {
+      const defaultItem = categories.find((item) => item.isDefault) || categories[0]
+      return defaultItem ? defaultItem.id : 0
+    }
+    return 0
+  },
+  set: (val) => {
+    userSelectedCategory.value = val
+  }
+})
 
+// 3. Filtrado ultra limpio usando directamente el valor de la computada
 const filteredItems = computed(() => {
   if (!catalogItems.value) return []
 
-  // Si es 0, muestra todo
-  if (selectedCategory.value === 0) {
+  const currentId = selectedCategory.value
+
+  if (currentId === 0 || currentId === '' || currentId === null) {
     return catalogItems.value
   }
 
   return catalogItems.value.filter((item) => {
-    return String(item.catalogCategoryId) === String(selectedCategory.value)
+    return String(item.catalogCategoryId) === String(currentId)
   })
 })
 
