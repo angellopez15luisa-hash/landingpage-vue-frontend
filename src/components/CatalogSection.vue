@@ -11,7 +11,7 @@ import { CatalogItemAction } from '../business/actions/catalog-item.action';
 const queryClient = useQueryClient()
 let socket: Socket | null = null
 
-const selectedCategory = ref<number>(0)
+const selectedCategory = ref<number | string>(0)
 
 // Estados para vue-easy-lightbox
 const visibleRef = ref(false)
@@ -48,15 +48,21 @@ const onHide = () => {
 }
 
 const filteredItems = computed(() => {
-  if (selectedCategory.value === 1) {
+  if (!catalogItems.value) return []
+
+  // Si es 0, muestra todo
+  if (selectedCategory.value === 0) {
     return catalogItems.value
   }
-  return catalogItems.value?.filter((item) => item.catalogCategoryId === selectedCategory.value)
+
+  return catalogItems.value.filter((item) => {
+    return String(item.catalogCategoryId) === String(selectedCategory.value)
+  })
 })
 
 // Observamos catalogCategories y cuando tenga datos, buscamos el isDefault
 watch(
-  catalogCategories,
+  () => catalogCategories.value,
   (categories) => {
     if (categories && categories.length > 0) {
       const defaultItem = categories.find((item) => item.isDefault)
@@ -65,7 +71,7 @@ watch(
       }
     }
   },
-  { immediate: true }, // { immediate: true } hace que se ejecute apenas el componente se monta por si la data ya estuviera en caché
+  { immediate: true }
 )
 
 onMounted(() => {
