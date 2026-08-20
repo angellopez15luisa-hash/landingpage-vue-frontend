@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import {  catalogItems } from '@/data/catalog.data'
+// import {  catalogItems } from '@/data/catalog.data'
 import VueEasyLightbox from 'vue-easy-lightbox'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { GeneralSettingAction } from '@/business/actions/general-setting.action'
 import { CatalogCategoryAction } from '@/business/actions/catalog-category.action'
 import { io, Socket } from 'socket.io-client'
+import { CatalogItemAction } from '../business/actions/catalog-item.action';
 
 const queryClient = useQueryClient()
 let socket: Socket | null = null
@@ -29,6 +30,13 @@ const { data: catalogCategories } = useQuery({
   retry: false,
 })
 
+const { data: catalogItems } = useQuery({
+  queryKey: ['catalog-items'],
+  queryFn: () => CatalogItemAction.getAll(),
+  retry: false,
+})
+
+
 const showSingleImage = (imgUrl: string) => {
   imgsRef.value = [imgUrl]
   indexRef.value = 0
@@ -39,12 +47,12 @@ const onHide = () => {
   visibleRef.value = false
 }
 
-// const filteredItems = computed(() => {
-//   if (selectedCategory.value === 'Todos') {
-//     return catalogItems
-//   }
-//   return catalogItems.filter((item) => item.category === selectedCategory.value)
-// })
+const filteredItems = computed(() => {
+  if (selectedCategory.value === 1) {
+    return catalogItems.value
+  }
+  return catalogItems.value?.filter((item) => item.catalogCategoryId === selectedCategory.value)
+})
 
 // Observamos catalogCategories y cuando tenga datos, buscamos el isDefault
 watch(
@@ -76,6 +84,12 @@ onMounted(() => {
   socket.on('catalog-category', (data) => {
     console.log('🎯 ¡Evento recibido en la Navbar!', data)
     queryClient.invalidateQueries({ queryKey: ['catalog-categories'] })
+    // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
+  })
+
+   socket.on('catalog-item', (data) => {
+    console.log('🎯 ¡Evento recibido en la Navbar!', data)
+    queryClient.invalidateQueries({ queryKey: ['catalog-items'] })
     // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
   })
 
@@ -126,14 +140,14 @@ onMounted(() => {
     <div class="catalog-grid">
       <!-- v-for="(item, index) in filteredItems" -->
       <div
-      v-for="(item, index) in catalogItems"
+      v-for="(item, index) in filteredItems"
         :key="item.id"
         class="product-card animate-on-scroll"
         :style="{ transitionDelay: `${index * 0.1}s` }"
       >
         <!-- Al hacer clic llama a la función que abre el lightbox -->
-        <div class="product-image-wrapper clickable-zoom" @click="showSingleImage(item.image)">
-          <img :src="item.image" :alt="item.title" class="product-img" />
+        <div class="product-image-wrapper clickable-zoom" @click="showSingleImage(item.imagePath!)">
+          <img :src="item.imagePath" :alt="item.title" class="product-img" />
           <span v-if="item.badge" class="product-badge">{{ item.badge }}</span>
           <div class="product-overlay-action">
             <span class="btn-zoom-preview">🔍 Ampliar Imagen</span>
@@ -141,7 +155,7 @@ onMounted(() => {
         </div>
 
         <div class="product-info">
-          <span class="product-category">{{ item.category }}</span>
+          <span class="product-category">{{ item.catalogCategory?.text }}</span>
           <h3 class="product-title">{{ item.title }}</h3>
           <div class="product-footer">
             <span class="product-price">{{ item.price }}</span>
