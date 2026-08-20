@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { catalogCategories, catalogItems } from '@/data/catalog.data'
+import {  catalogItems } from '@/data/catalog.data'
 import VueEasyLightbox from 'vue-easy-lightbox'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { GeneralSettingAction } from '@/business/actions/general-setting.action'
