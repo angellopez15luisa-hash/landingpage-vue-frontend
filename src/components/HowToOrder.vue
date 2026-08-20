@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { nextTick, watch } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
+import { nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { GeneralSettingAction } from '@/business/actions/general-setting.action'
 import { OrderStepAction } from '@/business/actions/order-step.action'
+import { io, Socket } from 'socket.io-client'
+
+const queryClient = useQueryClient()
+let socket: Socket | null = null
 
 const { data: generalSetting } = useQuery({
   queryKey: ['general-setting'],
@@ -48,6 +52,41 @@ watch(
   },
   { immediate: true },
 )
+
+
+onMounted(() => {
+  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
+  socket = io(SOCKET_URL, {
+    transports: ['polling', 'websocket'],
+    reconnection: true,
+  })
+
+  // socket.on('connect', () => {
+  //   console.log('✅ Navbar conectado al socket con ID:', socket?.id)
+  // })
+
+  socket.on('general-setting', (data) => {
+    console.log('🎯 ¡Evento recibido en la Navbar!', data)
+    queryClient.invalidateQueries({ queryKey: ['general-setting'] })
+    // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
+  })
+
+  // socket.on('item-sections', (data) => {
+  //   console.log('🎯 ¡Evento recibido en la Navbar!', data)
+  //   queryClient.invalidateQueries({ queryKey: ['item-sections'] })
+  //   // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
+  // })
+})
+
+onUnmounted(() => {
+  // 4. Desconectamos el socket al desmontar el componente para evitar fugas de memoria
+  if (socket) {
+    socket.disconnect()
+  }
+})
+
+
 
 </script>
 
