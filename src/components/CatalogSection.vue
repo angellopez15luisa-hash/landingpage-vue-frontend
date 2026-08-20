@@ -39,12 +39,12 @@ const onHide = () => {
   visibleRef.value = false
 }
 
-const filteredItems = computed(() => {
-  if (selectedCategory.value === 'Todos') {
-    return catalogItems
-  }
-  return catalogItems.filter((item) => item.category === selectedCategory.value)
-})
+// const filteredItems = computed(() => {
+//   if (selectedCategory.value === 'Todos') {
+//     return catalogItems
+//   }
+//   return catalogItems.filter((item) => item.category === selectedCategory.value)
+// })
 
 // Observamos catalogCategories y cuando tenga datos, buscamos el isDefault
 watch(
@@ -124,8 +124,9 @@ onMounted(() => {
     </div>
 
     <div class="catalog-grid">
+      <!-- v-for="(item, index) in filteredItems" -->
       <div
-        v-for="(item, index) in filteredItems"
+      v-for="(item, index) in catalogItems"
         :key="item.id"
         class="product-card animate-on-scroll"
         :style="{ transitionDelay: `${index * 0.1}s` }"
