@@ -58,8 +58,16 @@ const selectedCategory = computed({
       return userSelectedCategory.value
     }
     const categories = catalogCategories.value
+
     if (categories && categories.length > 0) {
-      const defaultItem = categories.find((item) => item.isDefault) || categories[0]
+      // 🕵️‍♂️ Imprimimos en consola las categorías para ver qué trae exactamente el isDefault
+      console.log('Categorías recibidas:', categories)
+
+      // Buscamos el isDefault soportando booleanos, números (1) o strings ("true" / "1")
+      const defaultItem = categories.find(
+        (item:any) => item.isDefault === true || item.isDefault === 1 || String(item.isDefault) === 'true' || String(item.isDefault) === '1'
+      ) || categories[0]
+
       return defaultItem ? defaultItem.id : 0
     }
     return 0
@@ -75,7 +83,8 @@ const filteredItems = computed(() => {
 
   const currentId = selectedCategory.value
 
-  if (currentId === 0 || currentId === '' || currentId === null) {
+  // Si es 0 o vacío, mostramos todo
+  if (!currentId || currentId === 0 || currentId === '') {
     return catalogItems.value
   }
 
