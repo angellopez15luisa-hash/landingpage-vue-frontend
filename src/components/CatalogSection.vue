@@ -22,18 +22,24 @@ const { data: generalSetting } = useQuery({
   queryKey: ['general-setting'],
   queryFn: () => GeneralSettingAction.get(),
   retry: false,
+  staleTime: 0, // 👈 Forzar datos frescos
+  refetchOnMount: true, // 👈 Forzar recarga al montar el componente
 })
 
 const { data: catalogCategories } = useQuery({
   queryKey: ['catalog-categories'],
   queryFn: () => CatalogCategoryAction.getAll(),
   retry: false,
+  staleTime: 0,
+  refetchOnMount: true,
 })
 
 const { data: catalogItems } = useQuery({
   queryKey: ['catalog-items'],
   queryFn: () => CatalogItemAction.getAll(),
   retry: false,
+  staleTime: 0,
+  refetchOnMount: true,
 })
 
 
