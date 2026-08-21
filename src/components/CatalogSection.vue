@@ -1,49 +1,28 @@
 <script setup lang="ts">
-import { ref, computed, onMounted} from 'vue'
-// import {  catalogItems } from '@/data/catalog.data'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import VueEasyLightbox from 'vue-easy-lightbox'
-import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { GeneralSettingAction } from '@/business/actions/general-setting.action'
-import { CatalogCategoryAction } from '@/business/actions/catalog-category.action'
-import { io, Socket } from 'socket.io-client'
-import { CatalogItemAction } from '../business/actions/catalog-item.action';
+import { useQuery } from '@tanstack/vue-query'
 
-const queryClient = useQueryClient()
-let socket: Socket | null = null
-const userSelectedCategory = ref<number | string | null>(null)
+// 🔹 Importamos componentes y acciones
+import CatalogSectionTitles from './CatalogSectionTitles.vue'
+import CatalogSectionCategories from './CatalogSectionCategories.vue'
+import { CatalogItemAction } from '@/business/actions/catalog-item.action.ts'
+import type { CatalogItem } from '@/types/catalog-item.type.ts'
 
 // Estados para vue-easy-lightbox
 const visibleRef = ref(false)
 const imgsRef = ref<string[]>([])
 const indexRef = ref(0)
 
-const { data: generalSetting } = useQuery({
-  queryKey: ['general-setting'],
-  queryFn: () => GeneralSettingAction.get(),
-  retry: false,
-  staleTime: 0, // 👈 Forzar datos frescos
-  refetchOnMount: true, // 👈 Forzar recarga al montar el componente
-})
-
-const { data: catalogCategories } = useQuery({
-  queryKey: ['catalog-categories'],
-  queryFn: () => CatalogCategoryAction.getAll(),
-  retry: false,
-  staleTime: 0,
-  refetchOnMount: true,
-})
-
-const { data: catalogItems } = useQuery({
+// 🔹 Consumimos la data directamente de TanStack Query
+const { data: catalogItems = [] } = useQuery({
   queryKey: ['catalog-items'],
   queryFn: () => CatalogItemAction.getAll(),
   retry: false,
-  staleTime: 0,
-  refetchOnMount: true,
 })
 
-
-const showSingleImage = (imgUrl: string) => {
-  imgsRef.value = [imgUrl]
+const showSingleImage = (imgUrl: CatalogItem['imagePath']) => {
+  imgsRef.value = [imgUrl!]
   indexRef.value = 0
   visibleRef.value = true
 }
@@ -51,101 +30,40 @@ const showSingleImage = (imgUrl: string) => {
 const onHide = () => {
   visibleRef.value = false
 }
-// 2. Computed con getter y setter: si el usuario no ha hecho clic, busca el isDefault automáticamente de la caché
-const selectedCategory = computed({
-  get: () => {
-    if (userSelectedCategory.value !== null) {
-      return userSelectedCategory.value
-    }
-    const categories = catalogCategories.value
 
-    if (categories && categories.length > 0) {
-      // 🕵️‍♂️ Imprimimos en consola las categorías para ver qué trae exactamente el isDefault
-      console.log('Categorías recibidas:', categories)
+// 🔹 Función para inicializar o refrescar el Observer de las animaciones
+const initObserver = () => {
+  nextTick(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible')
+          } else {
+            entry.target.classList.remove('is-visible')
+          }
+        })
+      },
+      { threshold: 0.1 },
+    )
 
-      // Buscamos el isDefault soportando booleanos, números (1) o strings ("true" / "1")
-      const defaultItem = categories.find(
-        (item:any) => item.isDefault === true || item.isDefault === 1 || String(item.isDefault) === 'true' || String(item.isDefault) === '1'
-      ) || categories[0]
-
-      return defaultItem ? defaultItem.id : 0
-    }
-    return 0
-  },
-  set: (val) => {
-    userSelectedCategory.value = val
-  }
-})
-
-// 3. Filtrado ultra limpio usando directamente el valor de la computada
-const filteredItems = computed(() => {
-  if (!catalogItems.value) return []
-
-  // Si es 0, muestra todo
-  if (selectedCategory.value === 0) {
-    return catalogItems.value
-  }
-
-  return catalogItems.value.filter((item) => {
-    return String(item.catalogCategoryId) === String(selectedCategory.value)
+    document.querySelectorAll('.animate-on-scroll').forEach((el) => {
+      observer.observe(el)
+    })
   })
-})
+}
 
-// Observamos catalogCategories y cuando tenga datos, buscamos el isDefault
-// watch(
-//   () => catalogCategories.value,
-//   (categories) => {
-//     if (categories && categories.length > 0) {
-//       const defaultItem = categories.find((item) => item.isDefault)
-//       if (defaultItem) {
-//         selectedCategory.value = defaultItem.id
-//       }
-//     }
-//   },
-//   { immediate: true }
-// )
+// 🔹 Cada vez que la data de los items cambie y se renderice, re-activamos el observer
+watch(
+  catalogItems,
+  () => {
+    initObserver()
+  },
+  { deep: true, immediate: true },
+)
 
 onMounted(() => {
-  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
-
-  socket = io(SOCKET_URL, {
-    transports: ['polling', 'websocket'],
-    reconnection: true,
-  })
-
-  socket.on('general-setting', (data) => {
-    console.log('🎯 ¡Evento recibido en la Navbar!', data)
-    queryClient.invalidateQueries({ queryKey: ['general-setting'] })
-  })
-
-  socket.on('catalog-category', (data) => {
-    console.log('🎯 ¡Evento recibido en la Navbar!', data)
-    queryClient.invalidateQueries({ queryKey: ['catalog-categories'] })
-    // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
-  })
-
-   socket.on('catalog-item', (data) => {
-    console.log('🎯 ¡Evento recibido en la Navbar!', data)
-    queryClient.invalidateQueries({ queryKey: ['catalog-items'] })
-    // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
-  })
-
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-visible')
-        } else {
-          entry.target.classList.remove('is-visible')
-        }
-      })
-    },
-    { threshold: 0.1 },
-  )
-
-  document.querySelectorAll('.animate-on-scroll').forEach((el) => {
-    observer.observe(el)
-  })
+  initObserver()
 })
 </script>
 
@@ -153,37 +71,20 @@ onMounted(() => {
   <section class="catalog-container" id="catalogo">
     <div class="section-ambient-glow"></div>
 
-    <div class="section-header">
-      <h2 class="section-title animate-on-scroll">{{ generalSetting?.textTitleCatalogItem }}</h2>
-      <p class="section-subtitle animate-on-scroll">
-        {{ generalSetting?.textSubtitleCatalogItem }}
-      </p>
-    </div>
+    <!-- 🔹 Componente hijo de títulos -->
+    <CatalogSectionTitles />
 
-    <!-- Contenedor con mayor ancho para permitir ~8 o más botones por fila -->
-    <div class="catalog-filters animate-on-scroll">
-      <template v-for="category in catalogCategories" :key="category.id">
-        <button
-          v-if="category.isActive"
-          class="filter-btn"
-          :class="{ active: selectedCategory === category.id }"
-          @click="selectedCategory = category.id"
-        >
-          {{ category.text }}
-        </button>
-      </template>
-    </div>
+    <catalog-section-categories />
 
     <div class="catalog-grid">
-      <!-- v-for="(item, index) in filteredItems" -->
       <div
-      v-for="(item, index) in filteredItems"
+        v-for="(item, index) in catalogItems"
         :key="item.id"
         class="product-card animate-on-scroll"
         :style="{ transitionDelay: `${index * 0.1}s` }"
       >
         <!-- Al hacer clic llama a la función que abre el lightbox -->
-        <div class="product-image-wrapper clickable-zoom" @click="showSingleImage(item.imagePath!)">
+        <div class="product-image-wrapper clickable-zoom" @click="showSingleImage(item.imagePath)">
           <img :src="item.imagePath" :alt="item.title" class="product-img" />
           <span v-if="item.badge" class="product-badge">{{ item.badge }}</span>
           <div class="product-overlay-action">
@@ -231,24 +132,6 @@ onMounted(() => {
   pointer-events: none;
   z-index: 1;
 }
-.section-header {
-  text-align: center;
-  margin-bottom: 40px;
-  z-index: 2;
-}
-.section-title {
-  font-size: clamp(2rem, 4.5vw, 3.2rem);
-  font-weight: 900;
-  color: #ffffff;
-  text-transform: uppercase;
-  letter-spacing: -1px;
-  margin-bottom: 12px;
-}
-.section-subtitle {
-  font-size: 1.05rem;
-  color: #9da3c0;
-  font-weight: 500;
-}
 .catalog-filters {
   display: flex;
   justify-content: center;
@@ -256,7 +139,7 @@ onMounted(() => {
   gap: 10px;
   margin-bottom: 50px;
   z-index: 2;
-  max-width: 1150px; /* 🔹 Ampliado a 1150px para dar espacio a más elementos por fila de forma centrada */
+  max-width: 1150px;
   margin-left: auto;
   margin-right: auto;
   padding: 0 20px;
@@ -265,7 +148,7 @@ onMounted(() => {
   background: rgba(14, 16, 23, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.05);
   color: #9da3c0;
-  padding: 9px 20px; /* 🔹 Padding ligeramente optimizado para que quepan más fluidos */
+  padding: 9px 20px;
   border-radius: 99px;
   font-size: 0.85rem;
   font-weight: 700;
