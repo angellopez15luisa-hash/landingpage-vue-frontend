@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick, computed } from 'vue'
+import { ref, onMounted, watch, nextTick, computed, onUnmounted } from 'vue'
 import VueEasyLightbox from 'vue-easy-lightbox'
-import { useQuery } from '@tanstack/vue-query'
-
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 // 🔹 Importamos componentes y acciones
 import CatalogSectionTitles from './CatalogSectionTitles.vue'
 import CatalogSectionCategories from './CatalogSectionCategories.vue'
 import { CatalogItemAction } from '@/business/actions/catalog-item.action.ts'
 import type { CatalogItem } from '@/types/catalog-item.type.ts'
 import type { CatalogCategory } from '@/types/catalog-category.type.ts'
+import { io, Socket } from 'socket.io-client'
 
+let socket: Socket | null = null
+const queryClient = useQueryClient()
 // Estados para vue-easy-lightbox
 const visibleRef = ref(false)
 const imgsRef = ref<string[]>([])
@@ -107,7 +109,31 @@ watch(
 )
 
 onMounted(() => {
+
+  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
+  socket = io(SOCKET_URL, {
+    transports: ['polling', 'websocket'],
+    reconnection: true,
+  })
+  socket.on('catalog-item', async(data) => {
+    console.log('🎯 ¡Evento recibido en la Navbar!', data)
+    // Invalidamos y forzamos un refetch inmediato de los items del catálogo
+  await queryClient.invalidateQueries({ queryKey: ['catalog-items'] })
+
+  // O mejor aún, si tienes la instancia de la query o quieres forzar el refetch de esa key:
+  queryClient.refetchQueries({ queryKey: ['catalog-items'] })
+  })
+
+
   initObserver()
+})
+
+onUnmounted(() => {
+  // 4. Desconectamos el socket al desmontar el componente para evitar fugas de memoria
+  if (socket) {
+    socket.disconnect()
+  }
 })
 </script>
 
