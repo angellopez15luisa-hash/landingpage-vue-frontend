@@ -3,6 +3,9 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { CatalogCategoryAction } from '@/business/actions/catalog-category.action'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { io, Socket } from 'socket.io-client'
+import type { CatalogCategory } from '@/types/catalog-category.type'
+
+const emit = defineEmits<{ 'update:selectedCategory': [categoryId: CatalogCategory['id']] }>()
 
 const queryClient = useQueryClient()
 let socket: Socket | null = null
@@ -21,11 +24,18 @@ watch(
       const defaultItem = categories.find((item) => item.isDefault === true) || categories[0]
       if (defaultItem) {
         selectedCategory.value = defaultItem.id
+        emit('update:selectedCategory', defaultItem.id)
       }
     }
   },
   { immediate: true },
 )
+
+const selectCategory = (id:CatalogCategory['id']) => {
+  selectedCategory.value = id
+  console.log(selectedCategory.value)
+  emit('update:selectedCategory',id)
+}
 
 onMounted(() => {
   const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
@@ -40,7 +50,7 @@ onMounted(() => {
   })
 })
 onUnmounted(() => {
-   // 4. Desconectamos el socket al desmontar el componente para evitar fugas de memoria
+  // 4. Desconectamos el socket al desmontar el componente para evitar fugas de memoria
   if (socket) {
     socket.disconnect()
   }
@@ -54,7 +64,7 @@ onUnmounted(() => {
         v-if="category.isActive"
         class="filter-btn"
         :class="{ active: selectedCategory === category.id }"
-        @click="selectedCategory = category.id"
+        @click="selectCategory(category.id)"
       >
         {{ category.text }}
       </button>

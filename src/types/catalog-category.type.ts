@@ -1,12 +1,11 @@
 import type {
   catalogCategoriesDataResponseSchema,
-  catalogCategoriesResponseSchema
+  catalogCategoriesResponseSchema,
+  catalogCategorySchema,
 } from '@/schemas/catalog-category.schema'
 import z from 'zod'
 
-
-
-
+export type CatalogCategory = z.input<typeof catalogCategorySchema>
 
 export type CatalogCategoriesResponse = z.infer<typeof catalogCategoriesResponseSchema>
 
