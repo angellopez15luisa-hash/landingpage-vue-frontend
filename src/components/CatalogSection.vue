@@ -1,6 +1,8 @@
+<!-- eslint-disable @typescript-eslint/no-unused-vars -->
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick, computed, onUnmounted } from 'vue'
 import VueEasyLightbox from 'vue-easy-lightbox'
+// import { catalogItems } from "@/data/catalog.data.ts"
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 // 🔹 Importamos componentes y acciones
 import CatalogSectionTitles from './CatalogSectionTitles.vue'
@@ -17,6 +19,8 @@ const visibleRef = ref(false)
 const imgsRef = ref<string[]>([])
 const indexRef = ref(0)
 const selectedCategory = ref<CatalogCategory['id']>(0)
+const currentPage = ref(1)
+const itemsPerPage = ref(6)
 
 // 🔹 Consumimos la data directamente de TanStack Query
 const { data: catalogItems } = useQuery({
@@ -27,45 +31,56 @@ const { data: catalogItems } = useQuery({
 
 const filteredItems = computed(() => {
   const items = catalogItems.value ?? []
-   console.log(selectedCategory.value)
   if (!selectedCategory.value || selectedCategory.value === 1) {
     return items
   }
   return items.filter((item) => item.catalogCategoryId === selectedCategory.value)
 })
 
-// 2. ¡MUY IMPORTANTE! Agrega este watch para que cuando el filtro cambie,
-// el Observer vuelva a detectar las tarjetas recién pintadas
+// 🔹 Computada para cortar solo los elementos de la página actual
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value
+  const end = start + itemsPerPage.value
+  return filteredItems.value.slice(start, end)
+})
+
+const totalPages = computed(() => {
+  return Math.ceil(filteredItems.value.length / itemsPerPage.value) || 1
+})
+
+// 🔹 Al cambiar de categoría o de datos, regresamos siempre a la página 1
+watch(selectedCategory, () => {
+  currentPage.value = 1
+})
+
 watch(
-  filteredItems,
+  catalogItems,
   () => {
-    // 1. Quitamos la clase 'is-visible' de todas las tarjetas antes de que cambien
-    // Esto hace que se oculten instantáneamente al cambiar el filtro
+    currentPage.value = 1
+  },
+  { once: true },
+)
+
+// 🔹 Único watch encargado de manejar la animación de los elementos paginados y filtrados
+watch(
+  paginatedItems,
+  () => {
     const cards = document.querySelectorAll('.product-card')
     cards.forEach((el) => {
       el.classList.remove('is-visible')
     })
 
-    // 2. Esperamos a que Vue termine de renderizar el nuevo filtro
     nextTick(() => {
-      // 3. Volvemos a inicializar tu observer o simplemente dejamos que el observer
-      // original las detecte. Si tienes una función initObserver(), llámala aquí:
-      if (typeof initObserver === 'function') {
-        initObserver()
-      } else {
-        // O si quieres que aparezcan solas con un pequeño retraso natural:
-        const newCards = document.querySelectorAll('.product-card')
-        newCards.forEach((el, index) => {
-          setTimeout(() => {
-            el.classList.add('is-visible')
-          }, index * 100) // 👈 Esto le da ese efecto de "cascada" suave que tenías
-        })
-      }
+      const newCards = document.querySelectorAll('.product-card')
+      newCards.forEach((el, index) => {
+        setTimeout(() => {
+          el.classList.add('is-visible')
+        }, index * 100)
+      })
     })
   },
-  { deep: true }
+  { deep: true, immediate: true },
 )
-
 
 const showSingleImage = (imgUrl: CatalogItem['imagePath']) => {
   imgsRef.value = [imgUrl!]
@@ -76,6 +91,48 @@ const showSingleImage = (imgUrl: CatalogItem['imagePath']) => {
 const onHide = () => {
   visibleRef.value = false
 }
+
+// 🔹 Paginador inteligente con puntos suspensivos
+const displayedPages = computed(() => {
+  const total = totalPages.value
+  const current = currentPage.value
+  const delta = 2 // Cuántas páginas mostrar a los lados de la actual
+  const range: (number | string)[] = []
+  const rangeWithDots: (number | string)[] = []
+  let l: number | undefined = undefined
+
+  range.push(1)
+
+  for (let i = current - delta; i <= current + delta; i++) {
+    if (i < total && i > 1) {
+      range.push(i)
+    }
+  }
+
+  if (total > 1) {
+    range.push(total)
+  }
+
+  // Agregamos los puntos suspensivos donde falten saltos
+  for (const i of range) {
+    if (l !== undefined) {
+      if (typeof i === 'number' && typeof l === 'number') {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1)
+        } else if (i - l > 2) {
+          rangeWithDots.push('...')
+        }
+      }
+    }
+    rangeWithDots.push(i)
+    // Forzamos que l sea number si i es number, o lo manejamos seguro
+    if (typeof i === 'number') {
+      l = i
+    }
+  }
+
+  return rangeWithDots
+})
 
 // 🔹 Función para inicializar o refrescar el Observer de las animaciones
 const initObserver = () => {
@@ -99,38 +156,23 @@ const initObserver = () => {
   })
 }
 
-// 🔹 Cada vez que la data de los items cambie y se renderice, re-activamos el observer
-watch(
-  catalogItems,
-  () => {
-    initObserver()
-  },
-  { deep: true, immediate: true },
-)
-
 onMounted(() => {
-
   const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 
   socket = io(SOCKET_URL, {
     transports: ['polling', 'websocket'],
     reconnection: true,
   })
-  socket.on('catalog-item', async(data) => {
+  socket.on('catalog-item', async (data) => {
     console.log('🎯 ¡Evento recibido en la Navbar!', data)
-    // Invalidamos y forzamos un refetch inmediato de los items del catálogo
-  await queryClient.invalidateQueries({ queryKey: ['catalog-items'] })
-
-  // O mejor aún, si tienes la instancia de la query o quieres forzar el refetch de esa key:
-  queryClient.refetchQueries({ queryKey: ['catalog-items'] })
+    await queryClient.invalidateQueries({ queryKey: ['catalog-items'] })
+    queryClient.refetchQueries({ queryKey: ['catalog-items'] })
   })
-
 
   initObserver()
 })
 
 onUnmounted(() => {
-  // 4. Desconectamos el socket al desmontar el componente para evitar fugas de memoria
   if (socket) {
     socket.disconnect()
   }
@@ -147,8 +189,9 @@ onUnmounted(() => {
     <CatalogSectionCategories @update:selected-category="(id) => (selectedCategory = id)" />
 
     <div class="catalog-grid">
+      <!-- 🔹 CORREGIDO: Usamos paginatedItems en lugar de filteredItems -->
       <div
-        v-for="(item, index) in filteredItems"
+        v-for="(item, index) in paginatedItems"
         :key="item.id"
         class="product-card animate-on-scroll"
         :style="{ transitionDelay: `${index * 0.1}s` }"
@@ -173,12 +216,41 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <!-- 🔹 Controles de Paginación Inteligente -->
+    <div v-if="totalPages > 1" class="catalog-pagination">
+      <button class="pagination-btn" :disabled="currentPage === 1" @click="currentPage--">
+        ← Anterior
+      </button>
+
+      <div class="pagination-numbers">
+        <template v-for="(page, index) in displayedPages" :key="index">
+          <!-- Si es un número, pintamos el botón normal -->
+          <button
+            v-if="page !== '...'"
+            class="page-number-btn"
+            :class="{ active: page === currentPage }"
+            @click="currentPage = Number(page)"
+          >
+            {{ page }}
+          </button>
+
+          <!-- Si es '...', pintamos un span decorativo sin evento -->
+          <span v-else class="pagination-dots">...</span>
+        </template>
+      </div>
+
+      <button class="pagination-btn" :disabled="currentPage === totalPages" @click="currentPage++">
+        Siguiente →
+      </button>
+    </div>
+
     <!-- Componente oficial de la librería para el Zoom/Lightbox -->
     <vue-easy-lightbox :visible="visibleRef" :imgs="imgsRef" :index="indexRef" @hide="onHide" />
   </section>
 </template>
 
 <style scoped>
+/* Tus estilos se quedan exactamente igual */
 .catalog-container {
   position: relative;
   width: 100%;
@@ -232,9 +304,8 @@ onUnmounted(() => {
 }
 .catalog-grid {
   display: grid;
-  /* 🔹 Cambiamos auto-fit por auto-fill y acotamos el tamaño máximo de la columna */
   grid-template-columns: repeat(auto-fill, minmax(300px, 350px));
-  justify-content: center; /* 🔹 Esto centra las tarjetas hermosamente si hay pocas */
+  justify-content: center;
   gap: 30px;
   width: 100%;
   max-width: 1200px;
@@ -252,8 +323,8 @@ onUnmounted(() => {
   flex-direction: column;
   transition: transform 0.4s ease;
   width: 100%;
-  max-width: 350px; /* 🔹 Le ponemos un tope estricto de ancho máximo */
-  margin: 0 auto;   /* 🔹 La centra automáticamente si está sola */
+  max-width: 350px;
+  margin: 0 auto;
 }
 .product-image-wrapper {
   position: relative;
@@ -362,5 +433,73 @@ onUnmounted(() => {
 .animate-on-scroll.is-visible {
   opacity: 1;
   transform: translateY(0);
+}
+.catalog-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 50px;
+  z-index: 2;
+}
+
+.pagination-btn {
+  background: rgba(14, 16, 23, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  padding: 10px 20px;
+  border-radius: 99px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  border-color: rgba(0, 245, 160, 0.5);
+  color: #00f5a0;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-numbers {
+  display: flex;
+  gap: 8px;
+}
+
+.page-number-btn {
+  width: 40px;
+  height: 40px;
+  background: rgba(14, 16, 23, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #9da3c0;
+  border-radius: 50%;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.page-number-btn:hover {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.page-number-btn.active {
+  background: linear-gradient(135deg, #00f5a0 0%, #00d9f5 100%);
+  color: #0b0e14;
+  border-color: transparent;
+}
+.pagination-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 40px;
+  color: #9da3c0;
+  font-weight: 700;
+  font-size: 1rem;
 }
 </style>
