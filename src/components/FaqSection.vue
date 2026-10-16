@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { GeneralSettingAction } from '@/business/actions/general-setting.action'
-import { questionList } from '@/data/question.data'
+import { FaqItemQuestionService } from '@/business/services/faq-item-question.service'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { io, Socket } from 'socket.io-client'
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { nextTick, onMounted, onUnmounted, watch } from 'vue'
 
 const queryClient = useQueryClient()
-const faqList = ref(questionList)
+
 let socket: Socket | null = null
 
 const { data: generalSetting } = useQuery({
@@ -15,11 +15,11 @@ const { data: generalSetting } = useQuery({
   retry: false,
 })
 
-// const { data: faqItemQuestions } = useQuery({
-//   queryKey: ['review-opinions'],
-//   queryFn: () => FaqIte.getAll(),
-//   retry: false,
-// })
+const { data: faqItemQuestions } = useQuery({
+  queryKey: ['faq-item-questions'],
+  queryFn: () => FaqItemQuestionService.getAll(),
+  retry: false,
+})
 
 // Observer para animaciones
 const initObserver = async () => {
@@ -45,7 +45,7 @@ const initObserver = async () => {
 
 // Watch para reiniciar observer al cambiar de página o datos
 watch(
-  [generalSetting],
+  [faqItemQuestions, generalSetting],
   () => {
     initObserver()
   },
@@ -62,6 +62,10 @@ onMounted(() => {
 
   socket.on('general-setting', () => {
     queryClient.invalidateQueries({ queryKey: ['general-setting'] })
+  })
+
+  socket.on('faq-item-question', () => {
+    queryClient.invalidateQueries({ queryKey: ['faq-item-questions'] })
   })
 })
 
@@ -89,15 +93,16 @@ onUnmounted(() => {
 
     <!-- Contenedor de las cajas de FAQ -->
     <div class="faq-container">
-      <div
-        v-for="(faq, index) in faqList"
-        :key="faq.id"
-        class="faq-box animate-on-scroll"
-        :style="{ transitionDelay: `${index * 0.15}s` }"
-      >
-        <h3 class="faq-question">{{ faq.question }}</h3>
-        <p class="faq-answer">{{ faq.answer }}</p>
-      </div>
+      <template v-for="(faq, index) in faqItemQuestions" :key="faq.id">
+        <div
+          v-if="faq.isActive"
+          class="faq-box animate-on-scroll"
+          :style="{ transitionDelay: `${index * 0.15}s` }"
+        >
+          <h3 class="faq-question">{{ faq.question }}</h3>
+          <p class="faq-answer">{{ faq.answer }}</p>
+        </div>
+      </template>
     </div>
   </section>
 </template>
