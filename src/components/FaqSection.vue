@@ -1,10 +1,30 @@
 <script setup lang="ts">
+import { GeneralSettingAction } from '@/business/actions/general-setting.action'
 import { questionList } from '@/data/question.data'
-import { onMounted, ref } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { io, Socket } from 'socket.io-client'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
+const queryClient = useQueryClient()
 const faqList = ref(questionList)
+let socket: Socket | null = null
 
-onMounted(() => {
+const { data: generalSetting } = useQuery({
+  queryKey: ['general-setting'],
+  queryFn: () => GeneralSettingAction.get(),
+  retry: false,
+})
+
+// const { data: faqItemQuestions } = useQuery({
+//   queryKey: ['review-opinions'],
+//   queryFn: () => FaqIte.getAll(),
+//   retry: false,
+// })
+
+// Observer para animaciones
+const initObserver = async () => {
+  await nextTick()
+
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
@@ -18,9 +38,37 @@ onMounted(() => {
     { threshold: 0.1 },
   )
 
-  document.querySelectorAll('.animate-on-scroll').forEach((el) => {
+  document.querySelectorAll('.opinion-animate-scroll, .animate-on-scroll').forEach((el) => {
     observer.observe(el)
   })
+}
+
+// Watch para reiniciar observer al cambiar de página o datos
+watch(
+  [generalSetting],
+  () => {
+    initObserver()
+  },
+  { immediate: true },
+)
+
+onMounted(() => {
+  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
+  socket = io(SOCKET_URL, {
+    transports: ['polling', 'websocket'],
+    reconnection: true,
+  })
+
+  socket.on('general-setting', () => {
+    queryClient.invalidateQueries({ queryKey: ['general-setting'] })
+  })
+})
+
+onUnmounted(() => {
+  if (socket) {
+    socket.disconnect()
+  }
 })
 </script>
 
@@ -31,8 +79,12 @@ onMounted(() => {
 
     <!-- Encabezado de la sección -->
     <div class="section-header">
-      <h2 class="section-title animate-on-scroll">PREGUNTAS FRECUENTES</h2>
-      <p class="section-subtitle animate-on-scroll">Resolvemos tus dudas sobre el proceso de compra e importación</p>
+      <h2 class="section-title animate-on-scroll">
+        {{ generalSetting?.textTitleFaqItemQuestion }}
+      </h2>
+      <p class="section-subtitle animate-on-scroll">
+        {{ generalSetting?.textSubtitleFaqItemQuestion }}
+      </p>
     </div>
 
     <!-- Contenedor de las cajas de FAQ -->
@@ -123,7 +175,10 @@ onMounted(() => {
   padding: 26px 30px;
   overflow: hidden;
   z-index: 2;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
+  transition:
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.4s ease;
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
 }
 
@@ -171,7 +226,9 @@ onMounted(() => {
 .animate-on-scroll {
   opacity: 0;
   transform: translateY(40px);
-  transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1), transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+  transition:
+    opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1),
+    transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .animate-on-scroll.is-visible {
