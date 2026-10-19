@@ -5,10 +5,15 @@ import { GeneralSettingAction } from '@/business/actions/general-setting.action'
 import { ItemSectionAction } from '@/business/actions/item-section.action'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { io, Socket } from 'socket.io-client'
+
 // Estado reactivo para controlar el menú móvil
 const isMenuOpen = ref<boolean>(false)
+// Estado para guardar el href de la sección activa actual
+const activeSection = ref<string>('')
+
 const queryClient = useQueryClient()
 let socket: Socket | null = null
+let observer: IntersectionObserver | null = null
 
 const { data: generalSetting } = useQuery({
   queryKey: ['general-setting'],
@@ -38,25 +43,58 @@ onMounted(() => {
     reconnection: true,
   })
 
-    socket.on('general-setting', (data) => {
+  socket.on('general-setting', (data) => {
     console.log('🎯 ¡Evento recibido en la Navbar!', data)
     queryClient.invalidateQueries({ queryKey: ['general-setting'] })
-    // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
   })
 
   socket.on('item-sections', (data) => {
     console.log('🎯 ¡Evento recibido en la Navbar!', data)
     queryClient.invalidateQueries({ queryKey: ['item-sections'] })
-    // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
   })
+
+  // Configurar el IntersectionObserver para detectar la sección visible en el scroll
+  const handleIntersect: IntersectionObserverCallback = (entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        const hash = `#${entry.target.id}`
+        activeSection.value = hash
+
+        // Esto actualiza la URL del navegador silenciosamente mientras haces scroll
+        window.history.replaceState(null, '', hash)
+      }
+    })
+  }
+
+  observer = new IntersectionObserver(handleIntersect, {
+    root: null,
+    // Ajusta el margen para que detecte la sección un poco antes de llegar al centro de la pantalla
+    rootMargin: '-20% 0px -60% 0px',
+    threshold: 0,
+  })
+
+  // Observar todas las secciones del DOM que tengan un ID mapeado desde itemSections
+  setTimeout(() => {
+    const sections = document.querySelectorAll('section[id], div[id]')
+    sections.forEach((sec) => observer?.observe(sec))
+  }, 500)
 })
 
 onUnmounted(() => {
-  // 4. Desconectamos el socket al desmontar el componente para evitar fugas de memoria
   if (socket) {
     socket.disconnect()
   }
+  if (observer) {
+    observer.disconnect()
+  }
 })
+
+const handleMenuClick = (href?: string) => {
+  if (href) {
+    activeSection.value = href
+  }
+  closeMenu()
+}
 </script>
 
 <template>
@@ -71,30 +109,22 @@ onUnmounted(() => {
         @click="toggleMenu"
         aria-label="Abrir menu"
       >
-        <span> </span>
+        <span></span>
         <span></span>
         <span></span>
       </button>
       <ul class="menu-items" :class="{ active: isMenuOpen }">
         <template v-for="item in itemSections" :key="item.id">
-          <!-- El v-if evalúa aquí adentro sin romper el bucle -->
           <li v-if="item.flagNavbar">
-            <a :href="item.href" @click="closeMenu">{{ item.text }}</a>
+            <a
+              :href="item.href"
+              :class="{ active: activeSection === item.href }"
+              @click="handleMenuClick(item.href)"
+            >
+              {{ item.text }}
+            </a>
           </li>
         </template>
-
-        <!-- <li  v-for="item in itemSections" :key="item.id" ><a :href="item.href" @click="closeMenu" >{{ item.text }}</a></li> -->
-
-        <!-- <li><a href="#catalogo" @click="closeMenu">Catalogo</a></li>
-        <li><a href="#opiniones" @click="closeMenu">Opiniones</a></li>
-        <li><a href="#faq" @click="closeMenu">Preguntas</a></li>
-        <li><a href="#contacto" @click="closeMenu">Contacto</a></li> -->
-
-        <!-- <li><a href="#como-pedir" @click="closeMenu">¿Como pedir?</a></li>
-        <li><a href="#catalogo" @click="closeMenu">Catalogo</a></li>
-        <li><a href="#opiniones" @click="closeMenu">Opiniones</a></li>
-        <li><a href="#faq" @click="closeMenu">Preguntas</a></li>
-        <li><a href="#contacto" @click="closeMenu">Contacto</a></li> -->
       </ul>
       <a :href="generalSetting?.textHrefNavbar" target="_blank" class="btn-island-ws">
         {{ generalSetting?.textButtonNavbar }}
@@ -163,8 +193,11 @@ onUnmounted(() => {
   font-weight: 600;
   transition: all 0.2s;
 }
-.menu-items a:hover {
+
+.menu-items a:hover,
+.menu-items a.active {
   color: var(--accent-mint, #00f5a0);
+  text-shadow: 0 0 10px rgba(0, 245, 160, 0.4);
 }
 
 .btn-island-ws {
@@ -209,6 +242,10 @@ onUnmounted(() => {
 .brand-logo-link:hover {
   text-decoration: none;
   color: inherit;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 /* --- RESPONSIVE MENU MOVIL (ESTLO ESCALERA) --- */
@@ -267,12 +304,16 @@ onUnmounted(() => {
     text-decoration: none;
     transition: all 0.3s ease;
   }
-  .menu-items a :hover,
+
+  .menu-items a:hover,
+  .menu-items a.active,
   .menu-items a:active {
     color: var(--accent-mint, #00f5a0);
     letter-spacing: 3px;
   }
+
   .menu-items li:has(a:hover),
+  .menu-items li:has(a.active),
   .menu-items li:has(a:active) {
     border-bottom-color: var(--accent-mint, #00f5a0);
     box-shadow: 0 4px 15px -5px rgba(0, 245, 160, 0.4);

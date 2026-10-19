@@ -77,7 +77,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="faq-section" id="faq">
+  <section class="faq-section" id="preguntas">
     <!-- Degradado ambiental sutil y profundo idéntico al resto de secciones -->
     <div class="section-ambient-glow"></div>
 
