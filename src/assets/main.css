@@ -1,8 +1,10 @@
 /* --- ESTILOS GLOBALES DE LA APLICACIÓN --- */
 
-/* Reseteo básico y variables globales de colores */
+/* Reseteo básico y variables globales (Tema Oscuro por defecto) */
 :root {
   --bg-main: #0b0e14;
+  --bg-card: rgba(26, 28, 40, 0.7);
+  --nav-bg: rgba(26, 28, 40, 0.85);
   --text-white: #ffffff;
   --text-soft: #9da3c0;
   --accent-mint: #00f5a0;
@@ -11,17 +13,28 @@
   --grad-fresh: linear-gradient(135deg, #00f5a0 0%, #00d9f5 100%);
 }
 
+/* Variables para Tema Claro */
+html.light-theme {
+  --bg-main: #f4f6fb;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --nav-bg: rgba(255, 255, 255, 0.85);
+  --text-white: #0f172a; /* Pasa a ser texto oscuro para contraste */
+  --text-soft: #475569;  /* Texto secundario oscuro */
+  --border-soft: rgba(0, 0, 0, 0.12);
+  --border-mint: rgba(0, 200, 130, 0.4);
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-/* html {
+html {
   scroll-behavior: smooth;
-  background-color: var(--bg-main, #0b0e14);
-  color-scheme: dark;
-} */
+  background-color: var(--bg-main);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
 
 body {
   background-color: var(--bg-main);
@@ -29,4 +42,39 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Títulos globales claros */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-white, #ffffff);
+}
+
+/* Textos secundarios o subtítulos */
+p, span, small {
+  color: var(--text-soft, #9da3c0);
+}
+
+/* ✅ AHORA (Usa variables que cambian solas según el tema) */
+.how-to-order-section {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+.order-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-soft);
+}
+
+html {
+  /* Habilita el desplazamiento suave nativo */
+  scroll-behavior: smooth;
+
+  /* Opcional: si quieres suavizar aún más la transición visual en navegadores compatibles */
+  height: 100%;
+}
+
+body {
+  /* Permite que el scroll de la ventana fluya con inercia */
+  overflow-y: overlay;
 }

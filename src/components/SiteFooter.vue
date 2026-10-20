@@ -54,7 +54,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <footer class="footer-section" id="contacto">
+  <footer class="footer-section">
     <!-- Degradado ambiental idéntico al estándar de las demás secciones -->
     <div class="section-ambient-glow"></div>
 

@@ -3,23 +3,55 @@ import { GeneralSettingAction } from '@/business/actions/general-setting.action'
 import { FaqItemQuestionService } from '@/business/services/faq-item-question.service'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { io, Socket } from 'socket.io-client'
-import { nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 const queryClient = useQueryClient()
 
 let socket: Socket | null = null
 
-const { data: generalSetting } = useQuery({
+// 🔹 Control de carga diferida (Lazy Query) según el hash actual
+const isTargetHash = window.location.hash === '#preguntas'
+const shouldFetch = ref(isTargetHash)
+
+onMounted(() => {
+  if (!isTargetHash) {
+    setTimeout(() => {
+      shouldFetch.value = true
+    }, 1100)
+  }
+
+  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
+  socket = io(SOCKET_URL, {
+    transports: ['polling', 'websocket'],
+    reconnection: true,
+  })
+
+  socket.on('general-setting', () => {
+    queryClient.invalidateQueries({ queryKey: ['general-setting'] })
+  })
+
+  socket.on('faq-item-question', () => {
+    queryClient.invalidateQueries({ queryKey: ['faq-item-questions'] })
+  })
+})
+
+const { data: generalSetting, isLoading: isLoadingGeneral } = useQuery({
   queryKey: ['general-setting'],
   queryFn: () => GeneralSettingAction.get(),
+  enabled: shouldFetch,
   retry: false,
 })
 
-const { data: faqItemQuestions } = useQuery({
+const { data: faqItemQuestions, isLoading: isLoadingFaq } = useQuery({
   queryKey: ['faq-item-questions'],
   queryFn: () => FaqItemQuestionService.getAll(),
+  enabled: shouldFetch,
   retry: false,
 })
+
+// Computada para el estado de carga general de la sección
+const isLoading = computed(() => shouldFetch.value && (isLoadingGeneral.value || isLoadingFaq.value))
 
 // Observer para animaciones
 const initObserver = async () => {
@@ -43,7 +75,7 @@ const initObserver = async () => {
   })
 }
 
-// Watch para reiniciar observer al cambiar de página o datos
+// Watch para reiniciar observer al cambiar datos
 watch(
   [faqItemQuestions, generalSetting],
   () => {
@@ -51,23 +83,6 @@ watch(
   },
   { immediate: true },
 )
-
-onMounted(() => {
-  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
-
-  socket = io(SOCKET_URL, {
-    transports: ['polling', 'websocket'],
-    reconnection: true,
-  })
-
-  socket.on('general-setting', () => {
-    queryClient.invalidateQueries({ queryKey: ['general-setting'] })
-  })
-
-  socket.on('faq-item-question', () => {
-    queryClient.invalidateQueries({ queryKey: ['faq-item-questions'] })
-  })
-})
 
 onUnmounted(() => {
   if (socket) {
@@ -81,29 +96,38 @@ onUnmounted(() => {
     <!-- Degradado ambiental sutil y profundo idéntico al resto de secciones -->
     <div class="section-ambient-glow"></div>
 
-    <!-- Encabezado de la sección -->
-    <div class="section-header">
-      <h2 class="section-title animate-on-scroll">
-        {{ generalSetting?.textTitleFaqItemQuestion }}
-      </h2>
-      <p class="section-subtitle animate-on-scroll">
-        {{ generalSetting?.textSubtitleFaqItemQuestion }}
-      </p>
+    <!-- 🔹 Spinner interno mientras TanStack Query trae la data -->
+    <div v-if="isLoading" class="faq-loading-state">
+      <div class="spinner-faq"></div>
+      <p>Cargando preguntas frecuentes...</p>
     </div>
 
-    <!-- Contenedor de las cajas de FAQ -->
-    <div class="faq-container">
-      <template v-for="(faq, index) in faqItemQuestions" :key="faq.id">
-        <div
-          v-if="faq.isActive"
-          class="faq-box animate-on-scroll"
-          :style="{ transitionDelay: `${index * 0.15}s` }"
-        >
-          <h3 class="faq-question">{{ faq.question }}</h3>
-          <p class="faq-answer">{{ faq.answer }}</p>
-        </div>
-      </template>
-    </div>
+    <!-- 🔹 Contenido visible solo cuando ya cargó -->
+    <template v-else>
+      <!-- Encabezado de la sección -->
+      <div class="section-header">
+        <h2 class="section-title animate-on-scroll">
+          {{ generalSetting?.textTitleFaqItemQuestion }}
+        </h2>
+        <p class="section-subtitle animate-on-scroll">
+          {{ generalSetting?.textSubtitleFaqItemQuestion }}
+        </p>
+      </div>
+
+      <!-- Contenedor de las cajas de FAQ -->
+      <div class="faq-container">
+        <template v-for="(faq, index) in faqItemQuestions" :key="faq.id">
+          <div
+            v-if="faq.isActive"
+            class="faq-box animate-on-scroll"
+            :style="{ transitionDelay: `${index * 0.15}s` }"
+          >
+            <h3 class="faq-question">{{ faq.question }}</h3>
+            <p class="faq-answer">{{ faq.answer }}</p>
+          </div>
+        </template>
+      </div>
+    </template>
   </section>
 </template>
 
@@ -119,6 +143,35 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  min-height: 450px;
+}
+
+/* --- ESTILOS DEL SPINNER INTERNO DE FAQ --- */
+.faq-loading-state {
+  width: 100%;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  z-index: 2;
+  color: #9da3c0;
+  font-size: 0.95rem;
+}
+
+.spinner-faq {
+  width: 45px;
+  height: 45px;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  border-top-color: #00f5a0;
+  border-radius: 50%;
+  animation: spinFaq 0.8s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+@keyframes spinFaq {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Resplandor ambiental idéntico para mantener coherencia visual */

@@ -2,7 +2,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick, computed, onUnmounted } from 'vue'
 import VueEasyLightbox from 'vue-easy-lightbox'
-// import { catalogItems } from "@/data/catalog.data.ts"
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 // 🔹 Importamos componentes y acciones
 import CatalogSectionTitles from './CatalogSectionTitles.vue'
@@ -22,12 +21,41 @@ const selectedCategory = ref<CatalogCategory['id']>(0)
 const currentPage = ref(1)
 const itemsPerPage = ref(6)
 
-// 🔹 Consumimos la data directamente de TanStack Query
-const { data: catalogItems } = useQuery({
+// 🔹 Control de carga diferida (Lazy Query) según el hash actual
+const isTargetHash = window.location.hash === '#catalogo'
+const shouldFetch = ref(isTargetHash)
+
+onMounted(() => {
+  if (!isTargetHash) {
+    setTimeout(() => {
+      shouldFetch.value = true
+    }, 300)
+  }
+
+  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
+  socket = io(SOCKET_URL, {
+    transports: ['polling', 'websocket'],
+    reconnection: true,
+  })
+  socket.on('catalog-item', async (data) => {
+    console.log('🎯 ¡Evento recibido en la Navbar!', data)
+    await queryClient.invalidateQueries({ queryKey: ['catalog-items'] })
+    queryClient.refetchQueries({ queryKey: ['catalog-items'] })
+  })
+
+  initObserver()
+})
+
+// 🔹 Consumimos la data directamente de TanStack Query con control `enabled`
+const { data: catalogItems, isLoading: isLoadingQuery } = useQuery({
   queryKey: ['catalog-items'],
   queryFn: () => CatalogItemAction.getAll(),
+  enabled: shouldFetch,
   retry: false,
 })
+
+const isLoading = computed(() => shouldFetch.value && isLoadingQuery.value)
 
 const filteredItems = computed(() => {
   const items = catalogItems.value ?? []
@@ -125,7 +153,6 @@ const displayedPages = computed(() => {
       }
     }
     rangeWithDots.push(i)
-    // Forzamos que l sea number si i es number, o lo manejamos seguro
     if (typeof i === 'number') {
       l = i
     }
@@ -156,22 +183,6 @@ const initObserver = () => {
   })
 }
 
-onMounted(() => {
-  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
-
-  socket = io(SOCKET_URL, {
-    transports: ['polling', 'websocket'],
-    reconnection: true,
-  })
-  socket.on('catalog-item', async (data) => {
-    console.log('🎯 ¡Evento recibido en la Navbar!', data)
-    await queryClient.invalidateQueries({ queryKey: ['catalog-items'] })
-    queryClient.refetchQueries({ queryKey: ['catalog-items'] })
-  })
-
-  initObserver()
-})
-
 onUnmounted(() => {
   if (socket) {
     socket.disconnect()
@@ -183,66 +194,69 @@ onUnmounted(() => {
   <section class="catalog-container" id="catalogo">
     <div class="section-ambient-glow"></div>
 
-    <!-- 🔹 Componente hijo de títulos -->
-    <CatalogSectionTitles />
+    <!-- 🔹 Spinner interno del Catálogo mientras TanStack Query trae la data -->
+    <div v-if="isLoading" class="catalog-loading-state">
+      <div class="spinner-catalog"></div>
+      <p>Cargando catálogo...</p>
+    </div>
 
-    <CatalogSectionCategories @update:selected-category="(id) => (selectedCategory = id)" />
+    <!-- 🔹 Contenido del catálogo visible solo cuando ya cargó -->
+    <template v-else>
+      <CatalogSectionTitles />
 
-    <div class="catalog-grid">
-      <!-- 🔹 CORREGIDO: Usamos paginatedItems en lugar de filteredItems -->
-      <div
-        v-for="(item, index) in paginatedItems"
-        :key="item.id"
-        class="product-card animate-on-scroll"
-        :style="{ transitionDelay: `${index * 0.1}s` }"
-      >
-        <!-- Al hacer clic llama a la función que abre el lightbox -->
-        <div class="product-image-wrapper clickable-zoom" @click="showSingleImage(item.imagePath)">
-          <img :src="item.imagePath" :alt="item.title" class="product-img" />
-          <span v-if="item.badge" class="product-badge">{{ item.badge }}</span>
-          <div class="product-overlay-action">
-            <span class="btn-zoom-preview">🔍 Ampliar Imagen</span>
+      <CatalogSectionCategories @update:selected-category="(id) => (selectedCategory = id)" />
+
+      <div class="catalog-grid">
+        <div
+          v-for="(item, index) in paginatedItems"
+          :key="item.id"
+          class="product-card animate-on-scroll"
+          :style="{ transitionDelay: `${index * 0.1}s` }"
+        >
+          <div class="product-image-wrapper clickable-zoom" @click="showSingleImage(item.imagePath)">
+            <img :src="item.imagePath" :alt="item.title" class="product-img" />
+            <span v-if="item.badge" class="product-badge">{{ item.badge }}</span>
+            <div class="product-overlay-action">
+              <span class="btn-zoom-preview">🔍 Ampliar Imagen</span>
+            </div>
           </div>
-        </div>
 
-        <div class="product-info">
-          <span class="product-category">{{ item.catalogCategory?.text }}</span>
-          <h3 class="product-title">{{ item.title }}</h3>
-          <div class="product-footer">
-            <span class="product-price">{{ item.price }}</span>
-            <a href="#contacto" class="btn-quick-order" @click.stop>Separar por WhatsApp</a>
+          <div class="product-info">
+            <span class="product-category">{{ item.catalogCategory?.text }}</span>
+            <h3 class="product-title">{{ item.title }}</h3>
+            <div class="product-footer">
+              <span class="product-price">{{ item.price }}</span>
+              <a href="#contacto" class="btn-quick-order" @click.stop>Separar por WhatsApp</a>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- 🔹 Controles de Paginación Inteligente -->
-    <div v-if="totalPages > 1" class="catalog-pagination">
-      <button class="pagination-btn" :disabled="currentPage === 1" @click="currentPage--">
-        ← Anterior
-      </button>
+      <!-- 🔹 Controles de Paginación Inteligente -->
+      <div v-if="totalPages > 1" class="catalog-pagination">
+        <button class="pagination-btn" :disabled="currentPage === 1" @click="currentPage--">
+          ← Anterior
+        </button>
 
-      <div class="pagination-numbers">
-        <template v-for="(page, index) in displayedPages" :key="index">
-          <!-- Si es un número, pintamos el botón normal -->
-          <button
-            v-if="page !== '...'"
-            class="page-number-btn"
-            :class="{ active: page === currentPage }"
-            @click="currentPage = Number(page)"
-          >
-            {{ page }}
-          </button>
+        <div class="pagination-numbers">
+          <template v-for="(page, index) in displayedPages" :key="index">
+            <button
+              v-if="page !== '...'"
+              class="page-number-btn"
+              :class="{ active: page === currentPage }"
+              @click="currentPage = Number(page)"
+            >
+              {{ page }}
+            </button>
+            <span v-else class="pagination-dots">...</span>
+          </template>
+        </div>
 
-          <!-- Si es '...', pintamos un span decorativo sin evento -->
-          <span v-else class="pagination-dots">...</span>
-        </template>
+        <button class="pagination-btn" :disabled="currentPage === totalPages" @click="currentPage++">
+          Siguiente →
+        </button>
       </div>
-
-      <button class="pagination-btn" :disabled="currentPage === totalPages" @click="currentPage++">
-        Siguiente →
-      </button>
-    </div>
+    </template>
 
     <!-- Componente oficial de la librería para el Zoom/Lightbox -->
     <vue-easy-lightbox :visible="visibleRef" :imgs="imgsRef" :index="indexRef" @hide="onHide" />
@@ -250,7 +264,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* Tus estilos se quedan exactamente igual */
 .catalog-container {
   position: relative;
   width: 100%;
@@ -261,7 +274,37 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  min-height: 500px;
 }
+
+/* --- ESTILOS DEL SPINNER INTERNO DEL CATÁLOGO --- */
+.catalog-loading-state {
+  width: 100%;
+  min-height: 350px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  z-index: 2;
+  color: #9da3c0;
+  font-size: 0.95rem;
+}
+
+.spinner-catalog {
+  width: 45px;
+  height: 45px;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  border-top-color: #00f5a0;
+  border-radius: 50%;
+  animation: spinCatalog 0.8s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+@keyframes spinCatalog {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .section-ambient-glow {
   position: absolute;
   top: 0;
@@ -273,34 +316,6 @@ onUnmounted(() => {
     radial-gradient(circle at 85% 75%, rgba(0, 217, 245, 0.02) 0%, transparent 40%);
   pointer-events: none;
   z-index: 1;
-}
-.catalog-filters {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 50px;
-  z-index: 2;
-  max-width: 1150px;
-  margin-left: auto;
-  margin-right: auto;
-  padding: 0 20px;
-}
-.filter-btn {
-  background: rgba(14, 16, 23, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  color: #9da3c0;
-  padding: 9px 20px;
-  border-radius: 99px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-.filter-btn.active {
-  background: linear-gradient(135deg, #00f5a0 0%, #00d9f5 100%);
-  color: #0b0e14;
-  border-color: transparent;
 }
 .catalog-grid {
   display: grid;

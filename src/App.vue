@@ -7,8 +7,12 @@ import Navbar from './components/Navbar.vue'
 import OpinionsSection from './components/OpinionsSection.vue'
 import FaqSection from './components/FaqSection.vue'
 import SiteFooter from "./components/SiteFooter.vue"
+import ContactSection from "./components/ContactSection.vue"
+import { VueQueryDevtools } from "@tanstack/vue-query-devtools"
 
 const showScrollTop = ref(false)
+const isLoading = ref(true)
+const isReady = ref(false)
 
 const handleScroll = () => {
   if (window.scrollY > 400) {
@@ -18,27 +22,20 @@ const handleScroll = () => {
   }
 }
 
-// --- SUBIDA SUAVE Y CONTROLADA (Mantiene el scroll del mouse 100% libre) ---
 const scrollToTop = () => {
   if (document.activeElement instanceof HTMLElement) {
     document.activeElement.blur()
   }
 
-  // Obtenemos la posición actual
   const startPosition = window.pageYOffset
   if (startPosition === 0) return
 
   const startTime = performance.now()
-  // 🎛️ AQUÍ CAMBIAS LA DURACIÓN EN MILISEGUNDOS:
-  // 1000 = 1 segundo, 1400 = 1.4 segundos (más lento y elegante).
-  // Al usar la API nativa con una animación temporal controlada, el navegador NUNCA bloquea el mouse.
   const duration = 1500
 
   const animation = (currentTime: number) => {
     const elapsedTime = currentTime - startTime
     const progress = Math.min(elapsedTime / duration, 1)
-
-    // Curva de aceleración suave (Ease Out Cubic)
     const ease = 1 - Math.pow(1 - progress, 3)
 
     window.scrollTo(0, startPosition * (1 - ease))
@@ -47,13 +44,14 @@ const scrollToTop = () => {
       requestAnimationFrame(animation)
     } else {
       window.scrollTo(0, 0)
+      // 🔹 Limpiamos el hash de la URL definitivamente al llegar arriba
+      window.history.replaceState(null, '', window.location.pathname)
     }
   }
 
   requestAnimationFrame(animation)
 }
 
-// --- GESTIÓN INTELIGENTE DE CLICS DEL MENÚ Y LOGO ---
 const handleMenuClick = (e: MouseEvent) => {
   const target = e.target as HTMLElement
   const link = target.closest('a')
@@ -61,7 +59,6 @@ const handleMenuClick = (e: MouseEvent) => {
   if (link && link.getAttribute('href')?.startsWith('#')) {
     const hash = link.getAttribute('href')
 
-    // Si es el logo o un enlace para subir al inicio
     if (!hash || hash === '#' || hash === '#inicio') {
       e.preventDefault()
       scrollToTop()
@@ -72,7 +69,7 @@ const handleMenuClick = (e: MouseEvent) => {
     if (element) {
       e.preventDefault()
 
-      const headerOffset = 90
+      const headerOffset = 80
       const elementPosition = element.getBoundingClientRect().top
       const offsetPosition = elementPosition + window.pageYOffset - headerOffset
 
@@ -87,6 +84,52 @@ const handleMenuClick = (e: MouseEvent) => {
 onMounted(() => {
   window.addEventListener('scroll', handleScroll, { passive: true })
   document.addEventListener('click', handleMenuClick)
+
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual'
+  }
+
+  const currentHash = window.location.hash
+
+  if (!currentHash) {
+    isLoading.value = false
+    setTimeout(() => { isReady.value = true }, 50)
+    return
+  }
+
+  document.body.style.overflow = 'hidden'
+
+  const doScrollWhenLoaded = () => {
+    const targetElement = document.querySelector(currentHash) as HTMLElement
+
+    if (targetElement) {
+      const headerOffset = 80
+      const elementPosition = targetElement.getBoundingClientRect().top
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset
+
+      window.scrollTo({
+        top: offsetPosition > 0 ? offsetPosition : 0,
+        behavior: 'instant'
+      })
+    }
+
+    setTimeout(() => {
+      document.body.style.overflow = ''
+      isLoading.value = false
+      setTimeout(() => {
+        isReady.value = true
+      }, 500)
+    }, 500)
+  }
+
+  if (document.readyState === 'complete') {
+    setTimeout(doScrollWhenLoaded, 200)
+  } else {
+    window.addEventListener('load', () => {
+      setTimeout(doScrollWhenLoaded, 200)
+    })
+    setTimeout(doScrollWhenLoaded, 900)
+  }
 })
 
 onUnmounted(() => {
@@ -96,7 +139,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app-container">
+  <!-- 🔹 Spinner global fuera del contenedor principal para que su texto nunca se oculte -->
+  <div v-if="isLoading" class="global-loader">
+    <div class="spinner"></div>
+    <p>Cargando sección...</p>
+  </div>
+
+  <div class="app-container" :class="{ 'content-ready': isReady }">
+    <!-- Estructura principal -->
     <Navbar />
     <main>
       <HeroSlider />
@@ -104,8 +154,10 @@ onUnmounted(() => {
       <CatalogSection />
       <OpinionsSection />
       <FaqSection />
-      <SiteFooter/>
+      <ContactSection />
+      <SiteFooter />
     </main>
+
     <!-- Botón flotante para volver arriba -->
     <transition name="fade">
       <button
@@ -130,6 +182,7 @@ onUnmounted(() => {
       </button>
     </transition>
   </div>
+  <VueQueryDevtools />
 </template>
 
 <style scoped>
@@ -138,19 +191,51 @@ onUnmounted(() => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  opacity: 0; /* Oculto mientras se calcula la posición exacta */
+  transition: opacity 0.4s ease-in-out;
 }
-/* 🔑 Suaviza y desacelera la animación de desplazamiento nativa */
+
+.app-container.content-ready {
+  opacity: 1; /* Aparece suavemente con todo en su sitio */
+}
+
 html {
   scroll-behavior: smooth;
-
   color-scheme: dark;
 }
 
-/* Opcional para navegadores basados en Webkit/Safari */
-@supports (scroll-behavior: smooth) {
-  html {
-    scroll-behavior: smooth;
-  }
+/* --- ESTILOS DEL SPINNER GLOBAL --- */
+.global-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #05070a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  z-index: 9999;
+  color: var(--text-soft, #9da3c0);
+  font-family: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+}
+
+.spinner {
+  width: 45px;
+  height: 45px;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  border-top-color: var(--accent-mint, #00f5a0);
+  border-radius: 50%;
+  animation: spin 0.8s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* --- ESTILOS DEL BOTÓN FLOTANTE --- */

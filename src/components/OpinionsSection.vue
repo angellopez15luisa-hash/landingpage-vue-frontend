@@ -13,17 +13,49 @@ let socket: Socket | null = null
 const paginaActual = ref(1)
 const porPagina = ref(3) // Exactamente 3 columnas en una sola fila por página
 
-const { data: generalSetting } = useQuery({
+// 🔹 Control de carga diferida (Lazy Query) según el hash actual
+const isTargetHash = window.location.hash === '#opiniones'
+const shouldFetch = ref(isTargetHash)
+
+onMounted(() => {
+  if (!isTargetHash) {
+    setTimeout(() => {
+      shouldFetch.value = true
+    }, 700)
+  }
+
+  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
+  socket = io(SOCKET_URL, {
+    transports: ['polling', 'websocket'],
+    reconnection: true,
+  })
+
+  socket.on('general-setting', () => {
+    queryClient.invalidateQueries({ queryKey: ['general-setting'] })
+  })
+
+  socket.on('review-opinions', () => {
+    queryClient.invalidateQueries({ queryKey: ['review-opinions'] })
+  })
+})
+
+const { data: generalSetting, isLoading: isLoadingGeneral } = useQuery({
   queryKey: ['general-setting'],
   queryFn: () => GeneralSettingAction.get(),
+  enabled: shouldFetch,
   retry: false,
 })
 
-const { data: reviewOpinions } = useQuery({
+const { data: reviewOpinions, isLoading: isLoadingReviews } = useQuery({
   queryKey: ['review-opinions'],
   queryFn: () => ReviewOpinionAction.getAll(),
+  enabled: shouldFetch,
   retry: false,
 })
+
+// Computada para manejar el estado de carga general de la sección
+const isLoading = computed(() => shouldFetch.value && (isLoadingGeneral.value || isLoadingReviews.value))
 
 // Función auxiliar robusta para convertir cualquier formato a booleano real
 const parseBooleanState = (value: unknown): boolean => {
@@ -129,23 +161,6 @@ watch(
   { immediate: true },
 )
 
-onMounted(() => {
-  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
-
-  socket = io(SOCKET_URL, {
-    transports: ['polling', 'websocket'],
-    reconnection: true,
-  })
-
-  socket.on('general-setting', () => {
-    queryClient.invalidateQueries({ queryKey: ['general-setting'] })
-  })
-
-  socket.on('review-opinions', () => {
-    queryClient.invalidateQueries({ queryKey: ['review-opinions'] })
-  })
-})
-
 onUnmounted(() => {
   if (socket) {
     socket.disconnect()
@@ -157,59 +172,68 @@ onUnmounted(() => {
   <section class="opinions-section" id="opiniones">
     <div class="section-ambient-glow"></div>
 
-    <div class="section-header">
-      <h2 class="section-title animate-on-scroll">{{ generalSetting?.textTitleReviewOpinion }}</h2>
-      <p class="section-subtitle animate-on-scroll">
-        {{ generalSetting?.textSubtitleReviewOpinion }}
-      </p>
+    <!-- 🔹 Spinner interno mientras TanStack Query trae la data -->
+    <div v-if="isLoading" class="opinions-loading-state">
+      <div class="spinner-opinions"></div>
+      <p>Cargando opiniones...</p>
     </div>
 
-    <!-- Contenedor estricto de 3 columnas (1 sola fila por página) -->
-    <div class="opinions-grid">
-      <div
-        v-for="(review, index) in reviewsPaginadas"
-        :key="review.id"
-        class="opinion-card opinion-animate-scroll"
-        :style="{ transitionDelay: `${index * 0.15}s` }"
-      >
-        <div class="card-glow"></div>
-        <div class="stars">
-          <i v-for="n in review.rating" :key="n" class="fa-solid fa-star"></i>
-        </div>
-        <p class="opinion-text">"{{ review.text }}"</p>
-        <h4 class="opinion-author">{{ review.name }}</h4>
+    <!-- 🔹 Contenido visible solo cuando ya cargó -->
+    <template v-else>
+      <div class="section-header">
+        <h2 class="section-title animate-on-scroll">{{ generalSetting?.textTitleReviewOpinion }}</h2>
+        <p class="section-subtitle animate-on-scroll">
+          {{ generalSetting?.textSubtitleReviewOpinion }}
+        </p>
       </div>
-    </div>
 
-    <!-- Paginador con puntos suspensivos -->
-    <div v-if="totalPaginas > 1" class="pagination-container animate-on-scroll">
-      <button
-        @click="cambiarPagina(paginaActual - 1)"
-        :disabled="paginaActual === 1"
-        class="page-btn"
-      >
-        &lt;
-      </button>
-
-      <template v-for="(item, idx) in paginasVisibles" :key="idx">
-        <span v-if="item === '...'" class="page-dots">...</span>
-        <button
-          v-else
-          @click="cambiarPagina(item)"
-          :class="['page-btn', { active: paginaActual === item }]"
+      <!-- Contenedor estricto de 3 columnas (1 sola fila por página) -->
+      <div class="opinions-grid">
+        <div
+          v-for="(review, index) in reviewsPaginadas"
+          :key="review.id"
+          class="opinion-card opinion-animate-scroll"
+          :style="{ transitionDelay: `${index * 0.15}s` }"
         >
-          {{ item }}
-        </button>
-      </template>
+          <div class="card-glow"></div>
+          <div class="stars">
+            <i v-for="n in review.rating" :key="n" class="fa-solid fa-star"></i>
+          </div>
+          <p class="opinion-text">"{{ review.text }}"</p>
+          <h4 class="opinion-author">{{ review.name }}</h4>
+        </div>
+      </div>
 
-      <button
-        @click="cambiarPagina(paginaActual + 1)"
-        :disabled="paginaActual === totalPaginas"
-        class="page-btn"
-      >
-        &gt;
-      </button>
-    </div>
+      <!-- Paginador con puntos suspensivos -->
+      <div v-if="totalPaginas > 1" class="pagination-container animate-on-scroll">
+        <button
+          @click="cambiarPagina(paginaActual - 1)"
+          :disabled="paginaActual === 1"
+          class="page-btn"
+        >
+          &lt;
+        </button>
+
+        <template v-for="(item, idx) in paginasVisibles" :key="idx">
+          <span v-if="item === '...'" class="page-dots">...</span>
+          <button
+            v-else
+            @click="cambiarPagina(item)"
+            :class="['page-btn', { active: paginaActual === item }]"
+          >
+            {{ item }}
+          </button>
+        </template>
+
+        <button
+          @click="cambiarPagina(paginaActual + 1)"
+          :disabled="paginaActual === totalPaginas"
+          class="page-btn"
+        >
+          &gt;
+        </button>
+      </div>
+    </template>
   </section>
 </template>
 
@@ -224,6 +248,35 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  min-height: 450px;
+}
+
+/* --- ESTILOS DEL SPINNER INTERNO DE OPINIONES --- */
+.opinions-loading-state {
+  width: 100%;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  z-index: 2;
+  color: #9da3c0;
+  font-size: 0.95rem;
+}
+
+.spinner-opinions {
+  width: 45px;
+  height: 45px;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  border-top-color: #00f5a0;
+  border-radius: 50%;
+  animation: spinOpinions 0.8s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+@keyframes spinOpinions {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .section-ambient-glow {
@@ -281,7 +334,6 @@ onUnmounted(() => {
 
 @media (max-width: 640px) {
   .opinions-grid {
-    grid-template-columns: 1minmax(0, 1fr);
     grid-template-columns: 1fr;
   }
 }

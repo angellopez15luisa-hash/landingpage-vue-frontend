@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { GeneralSettingAction } from '@/business/actions/general-setting.action'
 import { OrderStepAction } from '@/business/actions/order-step.action'
@@ -8,17 +8,51 @@ import { io, Socket } from 'socket.io-client'
 const queryClient = useQueryClient()
 let socket: Socket | null = null
 
-const { data: generalSetting } = useQuery({
+// 🔹 Control de carga diferida (Lazy Query) según el hash actual
+const isTargetHash = window.location.hash === '#como-pedir'
+const shouldFetch = ref(isTargetHash)
+
+onMounted(() => {
+  if (!isTargetHash) {
+    setTimeout(() => {
+      shouldFetch.value = true
+    }, 500)
+  }
+
+  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
+  socket = io(SOCKET_URL, {
+    transports: ['polling', 'websocket'],
+    reconnection: true,
+  })
+
+  socket.on('general-setting', (data) => {
+    console.log('🎯 ¡Evento recibido en HowToOrder (General Setting)!', data)
+    queryClient.invalidateQueries({ queryKey: ['general-setting'] })
+  })
+
+  socket.on('order-steps', (data) => {
+    console.log('🎯 ¡Evento recibido en HowToOrder (Order Steps)!', data)
+    queryClient.invalidateQueries({ queryKey: ['order-steps'] })
+  })
+})
+
+const { data: generalSetting, isLoading: isLoadingSettings } = useQuery({
   queryKey: ['general-setting'],
   queryFn: () => GeneralSettingAction.get(),
+  enabled: shouldFetch,
   retry: false,
 })
 
-const { data: orderSteps } = useQuery({
+const { data: orderSteps, isLoading: isLoadingSteps } = useQuery({
   queryKey: ['order-steps'],
   queryFn: () => OrderStepAction.getAll(),
+  enabled: shouldFetch,
   retry: false,
 })
+
+// Computada para saber si cualquiera de los dos sigue cargando de la API
+const isLoading = computed(() => shouldFetch.value && (isLoadingSettings.value || isLoadingSteps.value))
 
 const initObserver = async () => {
   await nextTick()
@@ -36,13 +70,11 @@ const initObserver = async () => {
     { threshold: 0.1 },
   )
 
-  // Observamos tanto las tarjetas como los elementos generales con animación
   document.querySelectorAll('.howto-animate-scroll, .animate-on-scroll').forEach((el) => {
     observer.observe(el)
   })
 }
 
-// Observamos cuando cualquiera de las dos datas esté lista
 watch(
   [orderSteps, generalSetting],
   ([steps, settings]) => {
@@ -53,87 +85,89 @@ watch(
   { immediate: true },
 )
 
-
-onMounted(() => {
-  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
-
-  socket = io(SOCKET_URL, {
-    transports: ['polling', 'websocket'],
-    reconnection: true,
-  })
-
-  // socket.on('connect', () => {
-  //   console.log('✅ Navbar conectado al socket con ID:', socket?.id)
-  // })
-
-  socket.on('general-setting', (data) => {
-    console.log('🎯 ¡Evento recibido en la Navbar!', data)
-    queryClient.invalidateQueries({ queryKey: ['general-setting'] })
-    // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
-  })
-
-  socket.on('order-steps', (data) => {
-    console.log('🎯 ¡Evento recibido en la Navbar!', data)
-    queryClient.invalidateQueries({ queryKey: ['order-steps'] })
-    // queryClient.invalidateQueries({ queryKey: ['item-sections'] })
-  })
-})
-
 onUnmounted(() => {
-  // 4. Desconectamos el socket al desmontar el componente para evitar fugas de memoria
   if (socket) {
     socket.disconnect()
   }
 })
-
-
-
 </script>
 
 <template>
   <section class="how-to-order-container" id="como-pedir">
-    <!-- Degradado ambiental muy sutil y profundo -->
     <div class="section-ambient-glow"></div>
 
-    <!-- Encabezado de la sección -->
-    <div class="section-header">
-      <h2 class="section-title animate-on-scroll">{{ generalSetting?.textTitleOrderStep }}</h2>
-      <p class="section-subtitle animate-on-scroll">{{ generalSetting?.textSubtitleOrderStep }}</p>
+    <!-- 🔹 Spinner interno mientras la API responde -->
+    <div v-if="isLoading" class="howto-loading-state">
+      <div class="spinner-howto"></div>
+      <p>Cargando sección...</p>
     </div>
 
-    <!-- Contenedor de las tarjetas de pasos -->
-    <div class="steps-grid">
-      <div
-        v-for="(step, index) in orderSteps"
-        :key="step.id"
-        class="step-card howto-animate-scroll"
-        :style="{ transitionDelay: `${index * 0.15}s` }"
-      >
-        <div class="card-glow"></div>
-        <span class="step-number">{{ step.number }}</span>
-        <h3 class="step-title">{{ step.title }}</h3>
-        <p class="step-description">{{ step.description }}</p>
+    <!-- 🔹 Contenido visible solo cuando ya cargó -->
+    <template v-else>
+      <div class="section-header">
+        <h2 class="section-title animate-on-scroll">{{ generalSetting?.textTitleOrderStep }}</h2>
+        <p class="section-subtitle animate-on-scroll">{{ generalSetting?.textSubtitleOrderStep }}</p>
       </div>
-    </div>
+
+      <div class="steps-grid">
+        <div
+          v-for="(step, index) in orderSteps"
+          :key="step.id"
+          class="step-card howto-animate-scroll"
+          :style="{ transitionDelay: `${index * 0.15}s` }"
+        >
+          <div class="card-glow"></div>
+          <span class="step-number">{{ step.number }}</span>
+          <h3 class="step-title">{{ step.title }}</h3>
+          <p class="step-description">{{ step.description }}</p>
+        </div>
+      </div>
+    </template>
   </section>
 </template>
 
 <style scoped>
-/* --- ESTILOS DE LA SECCIÓN ¿CÓMO PEDIR? --- */
 .how-to-order-container {
   position: relative;
   width: 100%;
   padding: 120px 20px;
-  /* Fondo base más profundo y oscuro para generar contraste */
   background-color: #05070a;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  min-height: 450px;
 }
 
-/* Resplandor ambiental reducido al mínimo para elegancia y contraste */
+/* --- ESTILOS DEL SPINNER INTERNO --- */
+.howto-loading-state {
+  width: 100%;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  z-index: 2;
+  color: #9da3c0;
+  font-size: 0.95rem;
+}
+
+.spinner-howto {
+  width: 45px;
+  height: 45px;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  border-top-color: #00f5a0;
+  border-radius: 50%;
+  animation: spinHowTo 0.8s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+@keyframes spinHowTo {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .section-ambient-glow {
   position: absolute;
   top: 0;
@@ -147,7 +181,6 @@ onUnmounted(() => {
   z-index: 1;
 }
 
-/* Encabezado */
 .section-header {
   text-align: center;
   margin-bottom: 60px;
@@ -170,7 +203,6 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-/* Cuadrícula de tarjetas */
 .steps-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -180,7 +212,6 @@ onUnmounted(() => {
   z-index: 2;
 }
 
-/* Tarjeta individual con fondo más oscuro para destacar sobre el fondo general */
 .step-card {
   position: relative;
   background: rgba(14, 16, 23, 0.85);
@@ -221,7 +252,6 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-/* Número indicador */
 .step-number {
   display: block;
   font-size: 2.5rem;
@@ -232,7 +262,6 @@ onUnmounted(() => {
   text-shadow: 0 0 20px rgba(0, 245, 160, 0.3);
 }
 
-/* Título del paso */
 .step-title {
   font-size: 1.35rem;
   font-weight: 800;
@@ -242,7 +271,6 @@ onUnmounted(() => {
   letter-spacing: 0.5px;
 }
 
-/* Descripción del paso */
 .step-description {
   font-size: 0.98rem;
   color: var(--text-soft, #9da3c0);
@@ -250,7 +278,6 @@ onUnmounted(() => {
   font-weight: 400;
 }
 
-/* --- SISTEMA DE ANIMACIÓN SUAVE Y LENTA (Idéntico al Catálogo) --- */
 .animate-on-scroll {
   opacity: 0;
   transform: translateY(40px);

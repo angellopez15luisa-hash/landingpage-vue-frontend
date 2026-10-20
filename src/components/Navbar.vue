@@ -8,8 +8,11 @@ import { io, Socket } from 'socket.io-client'
 
 // Estado reactivo para controlar el menú móvil
 const isMenuOpen = ref<boolean>(false)
-// Estado para guardar el href de la sección activa actual
-const activeSection = ref<string>('')
+
+const isScrollingToTop = ref(false)
+
+// Inicializa activeSection leyendo de una vez el hash actual de la URL
+const activeSection = ref<string>(window.location.hash || '')
 
 const queryClient = useQueryClient()
 let socket: Socket | null = null
@@ -43,24 +46,29 @@ onMounted(() => {
     reconnection: true,
   })
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   socket.on('general-setting', (data) => {
-    console.log('🎯 ¡Evento recibido en la Navbar!', data)
     queryClient.invalidateQueries({ queryKey: ['general-setting'] })
   })
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   socket.on('item-sections', (data) => {
-    console.log('🎯 ¡Evento recibido en la Navbar!', data)
     queryClient.invalidateQueries({ queryKey: ['item-sections'] })
   })
 
-  // Configurar el IntersectionObserver para detectar la sección visible en el scroll
-  const handleIntersect: IntersectionObserverCallback = (entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        const hash = `#${entry.target.id}`
-        activeSection.value = hash
+  let isInitialLoad = true
+  setTimeout(() => {
+    isInitialLoad = false
+  }, 2000)
 
-        // Esto actualiza la URL del navegador silenciosamente mientras haces scroll
+  const handleIntersect: IntersectionObserverCallback = (entries) => {
+    if (isInitialLoad) return
+
+    entries.forEach((entry) => {
+      if (entry.isIntersecting && window.scrollY >= 100) {
+        const id = entry.target.id
+        const hash = `#${id}`
+        activeSection.value = hash
         window.history.replaceState(null, '', hash)
       }
     })
@@ -68,16 +76,23 @@ onMounted(() => {
 
   observer = new IntersectionObserver(handleIntersect, {
     root: null,
-    // Ajusta el margen para que detecte la sección un poco antes de llegar al centro de la pantalla
     rootMargin: '-20% 0px -60% 0px',
     threshold: 0,
   })
 
-  // Observar todas las secciones del DOM que tengan un ID mapeado desde itemSections
   setTimeout(() => {
     const sections = document.querySelectorAll('section[id], div[id]')
     sections.forEach((sec) => observer?.observe(sec))
-  }, 500)
+  }, 1000)
+
+  const handleWindowScroll = () => {
+    if (window.scrollY < 100) {
+      activeSection.value = ''
+      // Nota: No se ejecuta replaceState para borrar el hash en la raíz y no competir con App.vue
+    }
+  }
+
+  window.addEventListener('scroll', handleWindowScroll)
 })
 
 onUnmounted(() => {
@@ -89,10 +104,87 @@ onUnmounted(() => {
   }
 })
 
-const handleMenuClick = (href?: string) => {
-  if (href) {
-    activeSection.value = href
+const handleMenuClick = (event: MouseEvent, href?: string) => {
+  if (href && href.startsWith('#')) {
+    event.preventDefault()
+
+    const targetId = href.replace('#', '')
+    const targetElement = document.getElementById(targetId)
+
+    if (targetElement) {
+      const navHeight = 90
+      const elementPosition = targetElement.getBoundingClientRect().top
+      const offsetPosition = elementPosition + window.pageYOffset - navHeight
+
+      const startPosition = window.pageYOffset
+      const distance = offsetPosition - startPosition
+      const duration = 900
+      let startTime: number | null = null
+
+      const animation = (currentTime: number) => {
+        if (startTime === null) startTime = currentTime
+        const timeElapsed = currentTime - startTime
+
+        const progress = Math.min(timeElapsed / duration, 1)
+        const ease =
+          progress < 0.5
+            ? 4 * progress * progress * progress
+            : (progress - 1) * (2 * progress - 2) * (2 * progress - 2) + 1
+
+        window.scrollTo(0, startPosition + distance * ease)
+
+        if (timeElapsed < duration) {
+          requestAnimationFrame(animation)
+        }
+      }
+
+      requestAnimationFrame(animation)
+
+      activeSection.value = href
+      window.history.replaceState(null, '', href)
+    }
   }
+  closeMenu()
+}
+
+const handleLogoClick = (event: MouseEvent) => {
+  event.preventDefault()
+
+  // 1. Bloqueamos cualquier actualización de hash por parte del scroll/observer
+  isScrollingToTop.value = true
+  activeSection.value = ''
+
+  // 2. Limpiamos la URL de inmediato
+  window.history.replaceState(null, '', window.location.pathname)
+
+  const startPosition = window.pageYOffset
+  const duration = 1500
+  let startTime: number | null = null
+
+  const animation = (currentTime: number) => {
+    if (startTime === null) startTime = currentTime
+    const timeElapsed = currentTime - startTime
+
+    const progress = Math.min(timeElapsed / duration, 1)
+    const ease =
+      progress < 0.5
+        ? 4 * progress * progress * progress
+        : (progress - 1) * (2 * progress - 2) * (2 * progress - 2) + 1
+
+    window.scrollTo(0, startPosition * (1 - ease))
+
+    if (timeElapsed < duration) {
+      requestAnimationFrame(animation)
+    } else {
+      // 3. Cuando termina la animación, aseguramos que la URL quede limpia y desbloqueamos
+      window.history.replaceState(null, '', window.location.pathname)
+      setTimeout(() => {
+        isScrollingToTop.value = false
+      }, 100)
+    }
+  }
+
+  requestAnimationFrame(animation)
   closeMenu()
 }
 </script>
@@ -100,9 +192,11 @@ const handleMenuClick = (href?: string) => {
 <template>
   <div class="header-fixed">
     <nav class="island-nav">
-      <a href="#inicio" class="brand-logo-link">
+      <!-- En lugar de href="#inicio", déjalo así para que no sea un enlace de anclaje tradicional -->
+      <a href="#" class="brand-logo-link" @click="handleLogoClick($event)">
         <div class="brand-logo">{{ generalSetting?.textNameCompany }}</div>
       </a>
+
       <button
         class="menu-toggle"
         :class="{ active: isMenuOpen }"
@@ -113,19 +207,22 @@ const handleMenuClick = (href?: string) => {
         <span></span>
         <span></span>
       </button>
+
       <ul class="menu-items" :class="{ active: isMenuOpen }">
         <template v-for="item in itemSections" :key="item.id">
           <li v-if="item.flagNavbar">
             <a
               :href="item.href"
               :class="{ active: activeSection === item.href }"
-              @click="handleMenuClick(item.href)"
+              @click="handleMenuClick($event, item.href)"
             >
               {{ item.text }}
             </a>
           </li>
         </template>
       </ul>
+
+      <!-- Botón de WhatsApp -->
       <a :href="generalSetting?.textHrefNavbar" target="_blank" class="btn-island-ws">
         {{ generalSetting?.textButtonNavbar }}
       </a>
@@ -211,10 +308,12 @@ const handleMenuClick = (href?: string) => {
   transition: all 0.2s ease;
   box-shadow: 0 4px 15px rgba(0, 245, 160, 0.25);
 }
+
 .btn-island-ws:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 245, 160, 0.4);
 }
+
 .menu-toggle {
   display: none;
   background: none;
@@ -224,6 +323,7 @@ const handleMenuClick = (href?: string) => {
   gap: 5px;
   z-index: 1001;
 }
+
 .menu-toggle span {
   width: 22px;
   height: 2px;
@@ -244,12 +344,7 @@ const handleMenuClick = (href?: string) => {
   color: inherit;
 }
 
-html {
-  scroll-behavior: smooth;
-}
-
-/* --- RESPONSIVE MENU MOVIL (ESTLO ESCALERA) --- */
-
+/* --- RESPONSIVE MENU MOVIL (ESTILO ESCALERA) --- */
 @media screen and (max-width: 868px) {
   .menu-toggle {
     display: flex;
@@ -289,6 +384,7 @@ html {
     transform: translateY(20px);
     transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
+
   .menu-items li:last-child {
     border-bottom: none;
   }
@@ -318,14 +414,17 @@ html {
     border-bottom-color: var(--accent-mint, #00f5a0);
     box-shadow: 0 4px 15px -5px rgba(0, 245, 160, 0.4);
   }
+
   .menu-items.active {
     opacity: 1;
     visibility: visible;
   }
+
   .menu-items.active li {
     opacity: 1;
     transform: translateY(0);
   }
+
   .menu-items.active li:nth-child(1) {
     transition-delay: 0.1s;
   }

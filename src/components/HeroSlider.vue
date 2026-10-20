@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { GeneralSettingAction } from '@/business/actions/general-setting.action'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { HeroSectionAction } from '@/business/actions/hero-section.action'
@@ -13,17 +13,50 @@ let socket: Socket | null = null
 const currentSlide = ref(0)
 let slideInterval: number | null = null
 
-const { data: generalSetting } = useQuery({
+// 🔹 Control inteligente de carga diferida (Lazy/Deferred Query)
+const isTargetHash = !window.location.hash || window.location.hash === '#inicio'
+const shouldFetch = ref(isTargetHash)
+
+onMounted(() => {
+  startInterval()
+
+  // Si el usuario recargó en otra sección, damos un respiro antes de activar las peticiones del Hero
+  if (!isTargetHash) {
+    setTimeout(() => {
+      shouldFetch.value = true
+    }, 300)
+  }
+
+  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+  socket = io(SOCKET_URL, {
+    transports: ['polling', 'websocket'],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
+  })
+
+  socket.on('hero-section', (data) => {
+    console.log('[Socket] Cambio detectado en Hero:', data)
+    queryClient.invalidateQueries({ queryKey: ['hero-sections'] })
+  })
+})
+
+const { data: generalSetting, isLoading: isLoadingSettings } = useQuery({
   queryKey: ['general-setting'],
   queryFn: () => GeneralSettingAction.get(),
+  enabled: shouldFetch,
   retry: false,
 })
 
-const { data: heroSections } = useQuery({
+const { data: heroSections, isLoading: isLoadingHero } = useQuery({
   queryKey: ['hero-sections'],
   queryFn: () => HeroSectionAction.getAll(),
+  enabled: shouldFetch,
   retry: false,
 })
+
+// Computada para el estado de carga general del Hero
+const isLoading = computed(() => shouldFetch.value && (isLoadingSettings.value || isLoadingHero.value))
 
 const nextSlide = () => {
   if (heroSections.value && heroSections.value.length > 0) {
@@ -41,32 +74,8 @@ const startInterval = () => {
   slideInterval = window.setInterval(nextSlide, 5000)
 }
 
-onMounted(() => {
-  startInterval()
-
-  // 2. Conexión al socket usando la variable de entorno de tu API URL (o tu puerto de backend)
-  // Asegúrate de que la URL apunte a la raíz de tu backend (sin el /api si el socket corre en el puerto general)
-  // socket = io(import.meta.env.VITE_API_URL || 'http://localhost:4700')
-  const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
-  socket = io(SOCKET_URL, {
-    transports: ['polling', 'websocket'], // Obliga a iniciar por HTTP polling que es más tolerante
-    reconnection: true, // Permite reintentar si Render está despertando
-    reconnectionAttempts: 5, // Intentos máximos
-    reconnectionDelay: 2000, // Espera 2 segundos entre cada intento
-  })
-
-  // 3. Escuchamos el evento que emite tu backend cuando cambian los hero sections
-  // (Cambia 'hero-changed' por el nombre del evento exacto que configuraste en tu backend)
-  socket.on('hero-section', (data) => {
-    console.log('[Socket] Cambio detectado en Hero:', data)
-    // Invalidamos la query para que TanStack traiga los nuevos datos automáticamente
-    queryClient.invalidateQueries({ queryKey: ['hero-sections'] })
-  })
-})
-
 onUnmounted(() => {
   if (slideInterval) clearInterval(slideInterval)
-  // 4. Desconectamos el socket al desmontar el componente para evitar fugas de memoria
   if (socket) {
     socket.disconnect()
   }
@@ -75,55 +84,63 @@ onUnmounted(() => {
 
 <template>
   <header class="hero-slider-container" id="inicio">
-    <!-- Pista de imágenes rotativas -->
-    <div class="slider-track">
-      <div
-        v-for="(slide, index) in heroSections"
-        :key="slide.id"
-        class="slide"
-        :class="{ active: currentSlide === index }"
-      >
-        <img :src="slide.imagePath" alt="Streetwear Collection" />
+    <!-- 🔹 Spinner interno mientras la API responde -->
+    <div v-if="isLoading" class="hero-loading-state">
+      <div class="spinner-hero"></div>
+      <p>Cargando inicio...</p>
+    </div>
+
+    <!-- 🔹 Contenido visible solo cuando ya cargó -->
+    <template v-else>
+      <!-- Pista de imágenes rotativas -->
+      <div class="slider-track">
+        <div
+          v-for="(slide, index) in heroSections"
+          :key="slide.id"
+          class="slide"
+          :class="{ active: currentSlide === index }"
+        >
+          <img :src="slide.imagePath" alt="Streetwear Collection" />
+        </div>
       </div>
-    </div>
 
-    <!-- Capas de sombra y brillo de fondo -->
-    <div class="hero-overlay"></div>
-    <div class="hero-glow"></div>
+      <!-- Capas de sombra y brillo de fondo -->
+      <div class="hero-overlay"></div>
+      <div class="hero-glow"></div>
 
-    <!-- Contenido principal alineado idéntico a la referencia -->
-    <div class="hero-content" v-if="heroSections && heroSections.length > 0">
-      <span class="drop-tag animate-text">{{ heroSections[currentSlide]?.tag }}</span>
+      <!-- Contenido principal -->
+      <div class="hero-content" v-if="heroSections && heroSections.length > 0">
+        <span class="drop-tag animate-text">{{ heroSections[currentSlide]?.tag }}</span>
 
-      <h1 class="hero-title animate-text">
-        {{ heroSections[currentSlide]?.title }}
-        <span class="highlight-line">{{ heroSections[currentSlide]?.highlightText }}</span>
-      </h1>
+        <h1 class="hero-title animate-text">
+          {{ heroSections[currentSlide]?.title }}
+          <span class="highlight-line">{{ heroSections[currentSlide]?.highlightText }}</span>
+        </h1>
 
-      <p class="hero-description animate-text">
-        {{ heroSections[currentSlide]?.description }}
-      </p>
+        <p class="hero-description animate-text">
+          {{ heroSections[currentSlide]?.description }}
+        </p>
 
-      <a href="#catalogo" class="btn-main-action animate-text">{{
-        generalSetting?.textButtonHeroSection
-      }}</a>
-    </div>
+        <a href="#catalogo" class="btn-main-action animate-text">{{
+          generalSetting?.textButtonHeroSection
+        }}</a>
+      </div>
 
-    <!-- Puntos indicadores de navegación inferiores -->
-    <div class="slider-nav" v-if="heroSections">
-      <div
-        v-for="(value, index) in heroSections"
-        :key="value.id"
-        class="slider-dot"
-        :class="{ active: currentSlide === index }"
-        @click="goToSlide(index)"
-      ></div>
-    </div>
+      <!-- Puntos indicadores de navegación inferiores -->
+      <div class="slider-nav" v-if="heroSections">
+        <div
+          v-for="(value, index) in heroSections"
+          :key="value.id"
+          class="slider-dot"
+          :class="{ active: currentSlide === index }"
+          @click="goToSlide(index)"
+        ></div>
+      </div>
+    </template>
   </header>
 </template>
 
 <style scoped>
-/* --- Tus estilos originales se mantienen exactamente igual --- */
 .hero-slider-container {
   position: relative;
   width: 100%;
@@ -133,6 +150,35 @@ onUnmounted(() => {
   justify-content: center;
   padding: 0 20px;
   overflow: hidden;
+  background-color: #05070a;
+}
+
+/* --- ESTILOS DEL SPINNER INTERNO DEL HERO --- */
+.hero-loading-state {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  z-index: 5;
+  color: #9da3c0;
+  font-size: 0.95rem;
+}
+
+.spinner-hero {
+  width: 45px;
+  height: 45px;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  border-top-color: #00f5a0;
+  border-radius: 50%;
+  animation: spinHero 0.8s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+@keyframes spinHero {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .slider-track {
