@@ -24,7 +24,7 @@ onMounted(() => {
   if (!isTargetHash) {
     setTimeout(() => {
       shouldFetch.value = true
-    }, 300)
+    }, 500)
   }
 
   const SOCKET_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
